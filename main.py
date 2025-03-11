@@ -9,8 +9,7 @@ import os
 os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1'
 
 
-SCREEN_WIDTH = 1600
-SCREEN_HEIGHT = 900
+SCREEN_WIDTH, SCREEN_HEIGHT = 1600, 900
 FPS = 60
 INPUT_STEP = 10
 DURATION = 30
@@ -258,7 +257,7 @@ while True:
     if not paused:
         screen.blit(fps_text, (10, SCREEN_HEIGHT-30))
         screen.blit(mouse_text, (30, 30))
-        screen.blit(sup_score, (SCREEN_WIDTH-570, 10))
+        screen.blit(sup_score, (SCREEN_WIDTH-570, 40))
         screen.blit(inf_score, (SCREEN_WIDTH-570, SCREEN_HEIGHT-140))
         screen.blit(clock_text, (SCREEN_WIDTH-570, (SCREEN_HEIGHT - clock_text.get_height()) // 2))
         if time < 0.5:
