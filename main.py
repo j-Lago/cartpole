@@ -13,6 +13,7 @@ SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 900
 FPS = 60
 INPUT_STEP = 10
+DURATION = 30
 
 paused = False
 name = 'Controllab'
@@ -39,21 +40,29 @@ joystick.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 
 font_norm = pygame.font.SysFont('Consolas', 22)
-font_med = pygame.font.SysFont('Consolas', 120)
-font_big = pygame.font.SysFont('Consolas', 240)
+font_med = pygame.font.SysFont('Consolas', 100)
+font_big = pygame.font.SysFont('Consolas', 200)
 
 players = dict()
-
+clock = pygame.time.Clock()
+start_ticks = pygame.time.get_ticks()
+pause_ticks = None
+time = 0.
+paused_time = 0.
 
 
 def pause():
-    global paused, name
+    global paused, name, pause_ticks, paused_time
     paused = not paused
     pygame.display.set_caption(name if not paused else f'{name} (PAUSED)')
+    if paused:
+        pause_ticks = pygame.time.get_ticks()
+    else:
+        paused_time += (pygame.time.get_ticks() - pause_ticks) / 1000
 
 
 def reset():
-    global players, paused, name, sounds
+    global players, paused, name, sounds, start_ticks, time, paused_time
     y_sup = 0.35
     y_inf = 0.75
     color_sup = (60, 120, 100)
@@ -65,6 +74,9 @@ def reset():
         'p7': Cart(screen, (SCREEN_WIDTH *0.3 // 3, int(SCREEN_HEIGHT*y_inf)), color=color_inf, width=3, size=(180, 21), th0=0.),
         'mouse': Player(screen, (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2), color=(90, 80, 70), size=100, width=1),
     }
+    start_ticks = pygame.time.get_ticks()
+    time = 0.
+    paused_time = 0.
     paused = False
     pygame.display.set_caption(name if not paused else f'{name} (PAUSED)')
     sounds['beep'].play()
@@ -72,7 +84,7 @@ def reset():
 
 reset()
 # Inicializando o relógio do Pygame para controlar o frame rate
-clock = pygame.time.Clock()
+
 
 
 
@@ -173,6 +185,7 @@ while True:
         #     rx.value = 1.
         # else:
         #     rx.update()
+        time = (pygame.time.get_ticks() - start_ticks) / 1000 - paused_time
 
         if players['p6'].alive:
             players['p6'].step(INPUT_STEP * rx.value*SENSITIVITY)
@@ -238,13 +251,19 @@ while True:
     sup_score = font_med.render(f"{players['p6'].score:>10d}", True, players['p6'].color)
     inf_score = font_med.render(f"{players['p7'].score:>10d}", True, players['p7'].color)
     mouse_text = font_norm.render(f'({mouse_x:4d},{mouse_y:4d})', True, hud_color)
+    clock_text = font_med.render(f"{DURATION - time:>10.1f}", True, (120, 120, 120))
+
 
 
     if not paused:
         screen.blit(fps_text, (10, SCREEN_HEIGHT-30))
         screen.blit(mouse_text, (30, 30))
-        screen.blit(sup_score, (SCREEN_WIDTH-670, 10))
-        screen.blit(inf_score, (SCREEN_WIDTH-670,SCREEN_HEIGHT-140))
+        screen.blit(sup_score, (SCREEN_WIDTH-570, 10))
+        screen.blit(inf_score, (SCREEN_WIDTH-570, SCREEN_HEIGHT-140))
+        screen.blit(clock_text, (SCREEN_WIDTH-570, (SCREEN_HEIGHT - clock_text.get_height()) // 2))
+        if time < 0.5:
+            start_text = font_big.render('START', True, (120, 120, 120))
+            screen.blit(start_text, ((SCREEN_WIDTH - start_text.get_width()) // 2, (SCREEN_HEIGHT - start_text.get_height()) // 2))
 
     pygame.display.flip()
     clock.tick(FPS)

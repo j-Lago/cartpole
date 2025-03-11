@@ -83,6 +83,9 @@ class Cart(Player):
         self.FORCE_FACTOR = force_factor
         self.model = Pendulo(1., 0.3, 5, x_damping=1, theta_damping=1, x0 = self.pos[0]/self.LINEAR_FACTOR, th0=th0, dt=1/60)
         self.jet = pygame.image.load("assets/jet.png")
+        # self.particles_colors = ((90, 90, 60), (90, 60, 90))
+        self.trace_particles_colors = ((90, 90, 60), (90, 60, 90))
+        self.highlight_particles_colors = ((200, 200, 60), self.color)
 
         self.N_trace = 120
         self.trace = deque(maxlen=self.N_trace)
@@ -118,11 +121,12 @@ class Cart(Player):
         if self.alive:
             color = self.color
             pole_color = (int(self.color[0]*1.5), int(self.color[1]*1.5), int(self.color[2]*1.5))
-            highlight_color = (200, 200, 30)
+            highlight_color = self.highlight_particles_colors[0]
             center_mass_colors = self.center_mass_colors
 
+
             for i, pos in enumerate(self.trace):
-                draw_particles(self.surface, (90, 90, 60), (90, 60, 90), pos, int(12*i/self.N_trace), int(2+10*i/120) )
+                draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos, int(12 * i / self.N_trace), int(2 + 10 * i / 120))
                 # pygame.draw.circle(self.surface, (60, 60, 60), pos, int(10*i/self.N_trace), 1 )
 
         else:
@@ -135,7 +139,7 @@ class Cart(Player):
 
         if self.cart_on_target and self.pole_on_target:
             pygame.draw.rect(self.surface, highlight_color, (self.pos[0] - base_width//2 - 2, self.pos[1] - base_height//2 - 2, base_width+4, base_height+4), self.width+2)
-            draw_path_particles(self.surface, (200, 200, 0), (30, 40, 30), (self.pos[0] - base_width//2 - 2, self.pos[1]), (self.pos[0] + base_width//2 - 2, self.pos[1]), (base_height)//2, 30)
+            draw_path_particles(self.surface, self.highlight_particles_colors[0], self.highlight_particles_colors[1], (self.pos[0] - base_width//2 - 2, self.pos[1]), (self.pos[0] + base_width//2 - 2, self.pos[1]), (base_height)//2, 30)
 
         pygame.draw.rect(self.surface, color, (self.pos[0] - base_width//2, self.pos[1] - base_height//2, base_width, base_height))
 
