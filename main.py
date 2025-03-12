@@ -9,5 +9,6 @@ if __name__ == '__main__':
                 assets.fonts,
                 assets.images,
                 40,
-                18)
+                18,
+                DO_NOT_RENDER = False)
     
