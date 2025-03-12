@@ -4,7 +4,7 @@ from pendulo_tf import Pendulo
 import random
 from _collections import deque
 from inputs import Axis, KeysControl
-
+from tools import draw_center_mass, draw_particles, draw_path_particles, lerp, lerp_v2, lerp_v3
 
 
 
@@ -108,6 +108,14 @@ class Cart():
         return self.alive
 
 
+    def feedback(self):
+        if self.alive:
+            if isinstance(self.input, Axis):
+                l = self.model.linear_acceleration / 120
+                r = -self.model.linear_acceleration / 120
+
+                self.input.source.rumble(l*.05, r, 100)
+
 
     def draw(self):
         base_width = self.size[0]
@@ -119,16 +127,13 @@ class Cart():
             pole_color = (int(self.color[0]*1.5), int(self.color[1]*1.5), int(self.color[2]*1.5))
             highlight_color = self.highlight_particles_colors[0]
             center_mass_colors = self.center_mass_colors
-
-            for i, pos in enumerate(self.trace):
-                draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos, int(12 * i / self.N_trace), int(2 + 10 * i / 120))
         else:
             c2 = (60, 60, 50)
             t = 0.85
-            color = color_v3(self.color, c2, t)
+            color = lerp_v3(self.color, c2, t)
             pole_color = color
             highlight_color = color
-            center_mass_colors = (color_v3(self.center_mass_colors[0], c2, t), color_v3(self.center_mass_colors[1], c2, t))
+            center_mass_colors = (lerp_v3(self.center_mass_colors[0], c2, t), lerp_v3(self.center_mass_colors[1], c2, t))
 
         if self.cart_on_target and self.pole_on_target:
             pygame.draw.rect(self.surface, highlight_color, (self.pos[0] - base_width//2 - 2, self.pos[1] - base_height//2 - 2, base_width+4, base_height+4), self.width+2)
@@ -151,6 +156,8 @@ class Cart():
         if self.alive:
             self.surface.blit(l_image, (self.pos[0] + base_width//2, self.pos[1] - jet_height//2, l_intensity, jet_height))
             self.surface.blit(r_image, (self.pos[0] - base_width//2-r_intensity, self.pos[1] - jet_height//2, r_intensity, jet_height))
+            for i, pos in enumerate(self.trace):
+                draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos, int(12 * i / self.N_trace), int(2 + 10 * i / 120))
 
 
         if self.pole_on_target:
@@ -185,39 +192,3 @@ def draw_pole(surface: pygame.surface,
         mass_pos = (pos[0] + center_mass*length * math.cos(theta), pos[1] + center_mass*length * math.sin(theta))
         draw_center_mass(surface, mass_pos, colors=center_mass_colors)
 
-
-def draw_center_mass(surface, pos, radius=15, colors=((255, 255, 255), (0, 0, 0))):
-    pygame.draw.circle(surface, colors[0], pos, radius, draw_bottom_right=True, draw_top_left=True)
-    pygame.draw.circle(surface, colors[1], pos, radius, draw_bottom_left=True, draw_top_right=True)
-
-
-def draw_particles(surface, color1, color2, pos, max_radius, density):
-    for _ in range(density):
-        angle = random.uniform(0, 2 * 3.14159)
-        radius = random.gauss(0, max_radius)
-        x = int(pos[0] + radius * math.cos(angle))
-        y = int(pos[1] + radius * math.sin(angle))
-        if color1 is None or color2 is None:
-            pcolor = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        else:
-            pcolor = color_v3(color1, color2, random.random())
-        pygame.draw.circle(surface, pcolor, (x,y), 1)
-
-
-def draw_path_particles(surface, color1, color2, start_pos, end_pos, max_radius, density):
-    for _ in range(density):
-        t = random.uniform(0., 1.)
-        center = lerp_v2(start_pos, end_pos, t)
-        draw_particles(surface, color1, color2, center, max_radius, density)
-
-
-def lerp(a, b, t):
-    return a + (b-a)*t
-
-
-def lerp_v2(p0, p1, t):
-    return lerp(p0[0], p1[0], t), lerp(p0[1], p1[1], t)
-
-
-def color_v3(p0, p1, t):
-    return lerp(p0[0], p1[0], t), lerp(p0[1], p1[1], t), lerp(p0[2], p1[2], t)

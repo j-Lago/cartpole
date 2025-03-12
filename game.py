@@ -9,6 +9,7 @@ import random
 from enum import Enum
 import assets
 from assets import colors as cols
+from tools import lerp_v3
 
 
 
@@ -56,15 +57,15 @@ class Game():
         self.axes = dict()
         key = 'p1'
         if key in self.joysticks.keys():
-            self.axes[key] = Axis(source=self.joysticks[key], channel=0, dead_zone=0.05)
+            self.axes[key] = Axis(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
-            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
+            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RCTRL)
 
         key = 'p2'
         if key in self.joysticks.keys():
-            self.axes[key] = Axis(source=self.joysticks[key], channel=0, dead_zone=0.05)
+            self.axes[key] = Axis(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
-            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_LALT)
+            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
 
 
         # assets
@@ -97,6 +98,9 @@ class Game():
             'p1'       : Cart(self.screen, self.axes['p1'], (self.screen_width * 2 // 3, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1, force_factor=self.MAX_POWER),
             'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1, force_factor=self.MAX_POWER),
         }
+
+        for axis in self.axes.values():
+            axis.value  = 0.
 
         pygame.event.clear()
 
@@ -134,7 +138,7 @@ class Game():
                         if joystick.get_button(JOYBUTTON['PS']): self.reset()
 
                     keys = pygame.key.get_pressed()
-                    if keys[pygame.K_SPACE]: self.pause()
+                    if keys[pygame.K_RETURN]: self.pause()
                     if keys[pygame.K_ESCAPE]: self.reset()
 
 
@@ -218,7 +222,9 @@ class Game():
         self.sounds['jet_l'].set_volume(l_volume if self.state == GAMESTATE.RUN else 0.)
 
     def process_feedback(self):
-        pass
+        if self.state == GAMESTATE.RUN:
+            for player in self.players.values():
+                player.feedback()
 
     def draw(self):
         self.screen.fill(cols['bg'])
@@ -226,16 +232,24 @@ class Game():
             player.draw()
 
 
-        # huds
+        dcols = { key: cols[key] if self.players[key].alive else lerp_v3(cols[key], (60, 60, 50), 0.85) for key in ['p1', 'p2']}
+
+
         fps = self.clock.get_fps()
         text_fps = self.fonts['small'].render(f"{fps:.1f}", True, cols['hud'])
         text_timer = self.fonts['normal'].render(f"{self.duration-self.time:.1f}", True, cols['timer'])
-        text_p1 = self.fonts['medium'].render(f"{self.players['p1'].score:>10d}", True, cols['p1'])
-        text_p2 = self.fonts['medium'].render(f"{self.players['p2'].score:>10d}", True, cols['p2'])
+        text_timer_label = self.fonts['small'].render(f"TIMER", True, cols['timer'])
+        text_p1 = self.fonts['medium'].render(f"{self.players['p1'].score:>10d}", True, dcols['p1'])
+        text_p2 = self.fonts['medium'].render(f"{self.players['p2'].score:>10d}", True, dcols['p2'])
+        text_p1_label = self.fonts['small'].render(f"P1 SCORE", True, dcols['p1'])
+        text_p2_label = self.fonts['small'].render(f"P2 SCORE", True, dcols['p2'])
         self.screen.blit(text_fps, (30, 30))
         self.screen.blit(text_p1, (self.screen_width - text_p1.get_width() - 30, 40))
         self.screen.blit(text_p2, (self.screen_width - text_p2.get_width() - 30, self.screen_height - 140))
         self.screen.blit(text_timer, (self.screen_width - text_timer.get_width() - 30, self.screen_center[1] - text_center(text_timer)[1]))
+        self.screen.blit(text_timer_label, (self.screen_width - text_timer_label.get_width()-30, self.screen_center[1] - text_center(text_timer_label)[1]-60))
+        self.screen.blit(text_p1_label, (self.screen_width - text_p1_label.get_width() - 30, 150))
+        self.screen.blit(text_p2_label, (self.screen_width - text_p2_label.get_width() - 30, self.screen_height - 170))
 
         if self.state == GAMESTATE.PRE_INIT:
             text = self.fonts['big'].render(f"START", True, cols['hud'])
@@ -258,5 +272,3 @@ def text_center(text) -> tuple[int, int]:
     return text.get_width() // 2, text.get_height() // 2
 
 
-if __name__ == '__main__':
-    game = Game('CartPole', 1600, 900, 60, assets.sounds, assets.fonts, assets.images, 40, 18)
