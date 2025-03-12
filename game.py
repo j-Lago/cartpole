@@ -59,7 +59,7 @@ class Game():
         if key in self.joysticks.keys():
             self.axes[key] = Axis(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
-            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RCTRL)
+            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
 
         key = 'p2'
         if key in self.joysticks.keys():

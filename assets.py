@@ -2,7 +2,7 @@ sounds = {
     'laser':    'assets/laser.wav',
     'pistol':   'assets/pistol.wav',
     'reload':   'assets/reload.wav',
-    'death':    'assets/mario.wav',
+    'death':    'assets/crash.wav',
     'coin':     'assets/coin.wav',
     'jet_r':    'assets/jet2.wav',
     'jet_l':    'assets/jet.wav',
