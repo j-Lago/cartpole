@@ -3,19 +3,28 @@ import math
 from pendulo_tf import Pendulo
 import random
 from _collections import deque
+from inputs import Axis, KeysControl
 
 
 
-class Player:
+
+class Cart():
     def __init__(self,
                  surface,
+                 controller: Axis | KeysControl,
                  pos=(0., 0.),
                  color=(255, 255, 255),
                  center_mass_colors = ( (255,)*3, (0,)*3 ),
                  selected = False,
                  size = 30,
-                 width = 4):
+                 width = 4,
+                 th0 = 0.,
+                 linear_factor=50,
+                 force_factor = 1.,
+                 alive=True,
+                 ):
 
+        self.input = controller
         self.surface = surface
         self.pos = pos if isinstance(pos, list) else list(pos)
         self.color = color
@@ -23,47 +32,6 @@ class Player:
         self.selected = selected
         self.size = size if isinstance(size, tuple) else list(size) if isinstance(size, list) else (size, size)
         self.width = width
-
-
-
-        
-    def saturate_pos(self) -> bool:
-        original = (self.pos[0], self.pos[1])
-        self.pos[0] = max(self.size[0] // 2, min(self.surface.get_width() - self.size[0] // 2, self.pos[0]))
-        self.pos[1] = max(self.size[1] // 2, min(self.surface.get_height() - self.size[1] // 2, self.pos[1]))
-        return self.pos[0] == original[0] and self.pos[1] == original[1]
-
-    def set_pos(self, x=None, y=None) -> bool:
-        if x is not None:
-            self.pos[0] = x
-        if y is not None:
-            self.pos[1] = y
-        return self.saturate_pos()
-
-        
-    def delta_pos(self, dx=0., dy=0.):
-        self.pos[0] += dx
-        self.pos[1] += dy
-        self.saturate_pos()
-
-    def draw(self):
-        pygame.draw.line(self.surface, self.color, (self.pos[0] - self.size[0] // 2, self.pos[1]), (self.pos[0] + self.size[1] // 2, self.pos[1]), self.width)
-        pygame.draw.line(self.surface, self.color, (self.pos[0], self.pos[1] - self.size[1] // 2), (self.pos[0], self.pos[1] + self.size[1] // 2), self.width)
-        if self.selected:
-            pygame.draw.line(self.surface, self.color, (self.pos[0] - self.size[0] // 3, self.pos[1]), (self.pos[0], self.pos[1] + self.size[1] // 3),  width=self.width)
-            pygame.draw.line(self.surface, self.color, (self.pos[0], self.pos[1] - self.size[1] // 3), (self.pos[0] + self.size[0] // 3, self.pos[1]),  width=self.width)
-            pygame.draw.line(self.surface, self.color, (self.pos[0] + self.size[0] // 3, self.pos[1]), (self.pos[0], self.pos[1] + self.size[1] // 3),  width=self.width)
-            pygame.draw.line(self.surface, self.color, (self.pos[0], self.pos[1] - self.size[1] // 3), (self.pos[0] - self.size[0] // 3, self.pos[1]),  width=self.width)
-
-
-
-class Cart(Player):
-    def __init__(self, *args,
-                 th0 = 0.,
-                 linear_factor=50,
-                 force_factor = 1.,
-                 alive=True, **kwargs):
-        super().__init__(*args, **kwargs)
 
         self.th_target = math.pi
         self.th_tol = math.radians(30.)
@@ -90,10 +58,38 @@ class Cart(Player):
         self.N_trace = 120
         self.trace = deque(maxlen=self.N_trace)
 
-    def step(self, input) -> bool:
-        self.last_input = input
+    def saturate_pos(self) -> bool:
+        original = (self.pos[0], self.pos[1])
+        self.pos[0] = max(self.size[0] // 2, min(self.surface.get_width() - self.size[0] // 2, self.pos[0]))
+        self.pos[1] = max(self.size[1] // 2, min(self.surface.get_height() - self.size[1] // 2, self.pos[1]))
+        return self.pos[0] == original[0] and self.pos[1] == original[1]
+
+    def set_pos(self, x=None, y=None) -> bool:
+        if x is not None:
+            self.pos[0] = x
+        if y is not None:
+            self.pos[1] = y
+        return self.saturate_pos()
+
+    def delta_pos(self, dx=0., dy=0.):
+        self.pos[0] += dx
+        self.pos[1] += dy
+        self.saturate_pos()
+
+    # def draw(self):
+    #     pygame.draw.line(self.surface, self.color, (self.pos[0] - self.size[0] // 2, self.pos[1]), (self.pos[0] + self.size[1] // 2, self.pos[1]), self.width)
+    #     pygame.draw.line(self.surface, self.color, (self.pos[0], self.pos[1] - self.size[1] // 2), (self.pos[0], self.pos[1] + self.size[1] // 2), self.width)
+    #     if self.selected:
+    #         pygame.draw.line(self.surface, self.color, (self.pos[0] - self.size[0] // 3, self.pos[1]), (self.pos[0], self.pos[1] + self.size[1] // 3),  width=self.width)
+    #         pygame.draw.line(self.surface, self.color, (self.pos[0], self.pos[1] - self.size[1] // 3), (self.pos[0] + self.size[0] // 3, self.pos[1]),  width=self.width)
+    #         pygame.draw.line(self.surface, self.color, (self.pos[0] + self.size[0] // 3, self.pos[1]), (self.pos[0], self.pos[1] + self.size[1] // 3),  width=self.width)
+    #         pygame.draw.line(self.surface, self.color, (self.pos[0], self.pos[1] - self.size[1] // 3), (self.pos[0] - self.size[0] // 3, self.pos[1]),  width=self.width)
+
+
+    def step(self) -> bool:
+        self.last_input = self.input.value
         if self.alive:
-            self.model.step(input*self.FORCE_FACTOR)
+            self.model.step(self.input.value*self.FORCE_FACTOR)
             if not self.set_pos(x=self.model.y[0][0]*self.LINEAR_FACTOR):
                 self.alive = False
 
@@ -124,11 +120,8 @@ class Cart(Player):
             highlight_color = self.highlight_particles_colors[0]
             center_mass_colors = self.center_mass_colors
 
-
             for i, pos in enumerate(self.trace):
                 draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos, int(12 * i / self.N_trace), int(2 + 10 * i / 120))
-                # pygame.draw.circle(self.surface, (60, 60, 60), pos, int(10*i/self.N_trace), 1 )
-
         else:
             c2 = (60, 60, 50)
             t = 0.85
@@ -143,11 +136,8 @@ class Cart(Player):
 
         pygame.draw.rect(self.surface, color, (self.pos[0] - base_width//2, self.pos[1] - base_height//2, base_width, base_height))
 
-        # pygame.draw.line(self.surface, color, (self.pos[0] - cross_width//2, self.pos[1]), (self.pos[0] + cross_width//2, self.pos[1]), self.width)
-        # pygame.draw.line(self.surface, color, (self.pos[0], self.pos[1] - cross_height//2), (self.pos[0], self.pos[1] + cross_height//2), self.width)
 
-
-        intensity_pixels_gain = int(8 + 2*random.random())
+        intensity_pixels_gain = int(8 + 2*random.random()) * 20
         r_intensity = max(self.last_input*intensity_pixels_gain, 0.)
         l_intensity = max(-self.last_input*intensity_pixels_gain, 0.)
         jet_height = base_height * 2.75

@@ -2,8 +2,8 @@ from typing import Dict, Any
 
 import pygame
 import sys
-from player import Player, Cart
-from inputs import Axis
+from player import Cart
+from inputs import Axis, KeysControl, JOYBUTTON
 import math
 import random
 from enum import Enum
@@ -17,6 +17,10 @@ os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1'
 
 
 
+
+
+
+
 class GAMESTATE(Enum):
     PRE_INIT = -1
     RUN = 1
@@ -25,24 +29,7 @@ class GAMESTATE(Enum):
     GAME_OVER = -3
 
 
-JOYBUTTON: dict[str, int] = {
-    'x': 0,
-    'c': 1,
-    's': 2,
-    't': 3,
-    'select': 4,
-    'PS': 5,
-    'start': 6,
-    'L3': 7,
-    'R3': 8,
-    'L1': 9,
-    'R1': 10,
-    'up': 11,
-    'down': 12,
-    'left': 13,
-    'right': 14,
-    'pad': 15,
-}
+
 
 
 class Game():
@@ -60,16 +47,25 @@ class Game():
         self.mixer = pygame.mixer
         self.mixer.init()
 
-        self.joystick = pygame.joystick.Joystick(0)
-        self.joystick.init()
-        self.axes = {
-            'L2': Axis(source=self.joystick, channel=4, normalization=lambda x: (x+1.0)*0.5),
-            'R2': Axis(source=self.joystick, channel=5, normalization=lambda x: (x+1.0)*0.5),
-            'lx': Axis(source=self.joystick, channel=0, dead_zone=0.05),
-            'ly': Axis(source=self.joystick, channel=1, dead_zone=0.05),
-            'rx': Axis(source=self.joystick, channel=2, dead_zone=0.05),
-            'ry': Axis(source=self.joystick, channel=3, dead_zone=0.05),
-        }
+        self.joysticks = dict()
+        for i in range(pygame.joystick.get_count()):
+            key = f'p{i+1}'
+            self.joysticks[key] = pygame.joystick.Joystick(i)
+            self.joysticks[key].init()
+
+        self.axes = dict()
+        key = 'p1'
+        if key in self.joysticks.keys():
+            self.axes[key] = Axis(source=self.joysticks[key], channel=0, dead_zone=0.05)
+        else:
+            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
+
+        key = 'p2'
+        if key in self.joysticks.keys():
+            self.axes[key] = Axis(source=self.joysticks[key], channel=0, dead_zone=0.05)
+        else:
+            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_LALT)
+
 
         # assets
         self.sounds = load_sounds(sounds)
@@ -96,15 +92,12 @@ class Game():
         y_sup = 0.35
         y_inf = 0.78
         self.players = {
-            'target_p1': Cart(self.screen, (self.screen_center[0]     , int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi, alive=False),
-            'target_p2': Cart(self.screen, (self.screen_center[0]     , int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi, alive=False),
-            'p1'       : Cart(self.screen, (self.screen_width * 2 // 3, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1),
-            'p2'       : Cart(self.screen, (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1),
+            'target_p1': Cart(self.screen, None, (self.screen_center[0]     , int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi, alive=False),
+            'target_p2': Cart(self.screen, None, (self.screen_center[0]     , int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi, alive=False),
+            'p1'       : Cart(self.screen, self.axes['p1'], (self.screen_width * 2 // 3, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1, force_factor=self.MAX_POWER),
+            'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1, force_factor=self.MAX_POWER),
         }
-        self.inputs = {
-            'p1': 0.,
-            'p2': 0.,
-        }
+
         pygame.event.clear()
 
 
@@ -130,14 +123,21 @@ class Game():
                     pygame.quit()
                     sys.exit()
 
-                if event.type == pygame.JOYAXISMOTION:
+                if event.type in [pygame.JOYAXISMOTION, pygame.JOYBUTTONDOWN, pygame.KEYUP, pygame.KEYDOWN]:
                     if self.state == GAMESTATE.RUN:
                         for axis in self.axes.values():
                             axis.update()
 
-                if event.type == pygame.JOYBUTTONDOWN:
-                    if self.joystick.get_button(JOYBUTTON['start']): self.pause()
-                    if self.joystick.get_button(JOYBUTTON['PS']): self.reset()
+                if event.type in [pygame.JOYBUTTONDOWN, pygame.KEYDOWN]:
+                    for joystick in self.joysticks.values():
+                        if joystick.get_button(JOYBUTTON['start']): self.pause()
+                        if joystick.get_button(JOYBUTTON['PS']): self.reset()
+
+                    keys = pygame.key.get_pressed()
+                    if keys[pygame.K_SPACE]: self.pause()
+                    if keys[pygame.K_ESCAPE]: self.reset()
+
+
 
             if self.state == GAMESTATE.RUN:
                 self.process_inputs()
@@ -194,25 +194,25 @@ class Game():
             self.reset()
 
     def process_inputs(self):
-        self.inputs['p1'] = self.axes['rx'].value * self.MAX_POWER
-        self.inputs['p2'] = self.axes['lx'].value * self.MAX_POWER
+        self.inputs['p1'] = self.axes['p1'].value * self.MAX_POWER
+        self.inputs['p2'] = self.axes['p2'].value * self.MAX_POWER
 
     def simulate(self):
 
         if self.players['p1'].alive:
-            self.players['p1'].step(self.inputs['p1'])
+            self.players['p1'].step()
             if not self.players['p1'].alive:
                 self.sounds['death'].play()
 
         if self.players['p2'].alive:
-            self.players['p2'].step(self.inputs['p2'])
+            self.players['p2'].step()
             if not self.players['p2'].alive:
                 self.sounds['death'].play()
 
 
     def process_sounds(self):
-        r_volume = abs(self.axes['rx'].value) if self.players['p1'].alive else 0.
-        l_volume = abs(self.axes['lx'].value) if self.players['p2'].alive else 0.
+        r_volume = abs(self.players['p1'].input.value) if self.players['p1'].alive else 0.
+        l_volume = abs(self.players['p2'].input.value) if self.players['p2'].alive else 0.
 
         self.sounds['jet_r'].set_volume(r_volume if self.state == GAMESTATE.RUN else 0.)
         self.sounds['jet_l'].set_volume(l_volume if self.state == GAMESTATE.RUN else 0.)
@@ -259,4 +259,4 @@ def text_center(text) -> tuple[int, int]:
 
 
 if __name__ == '__main__':
-    game = Game('CartPole', 1600, 900, 60, assets.sounds, assets.fonts, assets.images, 30, 18)
+    game = Game('CartPole', 1600, 900, 60, assets.sounds, assets.fonts, assets.images, 40, 18)
