@@ -4,8 +4,8 @@ sounds = {
     'reload':   'assets/reload.wav',
     'death':    'assets/mario.wav',
     'coin':     'assets/coin.wav',
-    'jet_r':    'assets/jet.wav',
-    'jet_l':    'assets/jet2.wav',
+    'jet_r':    'assets/jet2.wav',
+    'jet_l':    'assets/jet.wav',
     'beep':     'assets/beep.wav',
     'whistle':  'assets/whistle.wav',
 }
@@ -28,6 +28,7 @@ colors = {
     'timer': ( 90,  60,  50),
     'p1'   : ( 60, 120, 100),
     'p2'   : (120,  60, 100),
+    'best_score': ( 90,  60,  50),
 }
 
 sizes = {

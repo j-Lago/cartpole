@@ -1,3 +1,4 @@
+import random
 from typing import Callable
 from functools import partial
 import pygame
@@ -59,6 +60,16 @@ class KeysControl():
 
         self.value = self.normalization(out)
 
+
+class IAControl:
+    def __init__(self, initial_value = 0., normalization: Callable = lambda x: x):
+        self.value = initial_value
+        self.normalization = normalization
+
+
+    def update(self):
+        self.value += self.normalization((random.random()*2-1)*0.6)
+        self.value = max(-1., min(self.value, 1.))
 
 
 

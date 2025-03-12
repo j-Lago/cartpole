@@ -3,23 +3,18 @@ from typing import Dict, Any
 import pygame
 import sys
 from player import Cart
-from inputs import Axis, KeysControl, JOYBUTTON
+from inputs import Axis, KeysControl, IAControl, JOYBUTTON
 import math
 import random
 from enum import Enum
 import assets
 from assets import colors as cols
 from tools import lerp_v3
-
+import json
 
 
 import os
 os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1'
-
-
-
-
-
 
 
 class GAMESTATE(Enum):
@@ -30,15 +25,13 @@ class GAMESTATE(Enum):
     GAME_OVER = -3
 
 
-
-
-
 class Game():
-    def __init__(self, name: str, window_size: tuple[int, int] | None, fps: int, sounds: dict, fonts: dict, images: dict, game_duration: float = 30., max_power: float = 18.):
+    def __init__(self, name: str, window_size: tuple[int, int] | None, fps: int, sounds: dict, fonts: dict, images: dict, game_duration: float = 30., max_power: float = 18., save_file: str = 'meta/save.json'):
 
         self.fps = fps
         self.duration = game_duration
         self.MAX_POWER = max_power
+        self.save_file_name =  save_file
 
         pygame.init()
         pygame.mouse.set_visible(False)
@@ -72,7 +65,8 @@ class Game():
         if key in self.joysticks.keys():
             self.axes[key] = Axis(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
-            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
+            # self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
+            self.axes[key] = IAControl()
 
 
         # assets
@@ -89,6 +83,17 @@ class Game():
         self.inputs = dict()
         # -- reset --------------------------------------
         self.reset()
+
+        try:
+            with open(self.save_file_name, 'r') as arquivo_json:
+                data = json.load(arquivo_json)
+            if 'best_score' in data.keys():
+                self.best_score = data['best_score']
+            else:
+                self.best_score = 0
+        except:
+            self.best_score = 0
+
 
         self.loop()
 
@@ -131,13 +136,9 @@ class Game():
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    self.save_to_file()
                     pygame.quit()
                     sys.exit()
-
-                if event.type in [pygame.JOYAXISMOTION, pygame.JOYBUTTONDOWN, pygame.KEYUP, pygame.KEYDOWN]:
-                    if self.state == GAMESTATE.RUN:
-                        for axis in self.axes.values():
-                            axis.update()
 
                 if event.type in [pygame.JOYBUTTONDOWN, pygame.KEYDOWN]:
                     for joystick in self.joysticks.values():
@@ -176,17 +177,23 @@ class Game():
     def pre_init(self):
         pass
 
+    def save_to_file(self):
+        save = {'best_score': self.best_score}
+        with open(self.save_file_name, 'w') as arquivo_json:
+            json.dump(save, arquivo_json)
+
     def game_over(self):
         self.state = GAMESTATE.GAME_OVER
         text = self.fonts['big'].render(f"GAME OVER", True, cols['hud'])
         self.screen.blit(text, (self.screen_center[0] - text_center(text)[0], self.screen_center[1] - text_center(text)[1]))
-
+        self.save_score()
 
     def timeout(self):
         self.state = GAMESTATE.TIMEOUT
         self.sounds['whistle'].play()
         text = self.fonts['big'].render(f"TIMEOUT", True, cols['hud'])
         self.screen.blit(text, (self.screen_center[0] - text_center(text)[0], self.screen_center[1] - text_center(text)[1]))
+        self.save_score()
 
     def start(self):
         self.state = GAMESTATE.RUN
@@ -204,7 +211,15 @@ class Game():
         else:
             self.reset()
 
+    def save_score(self):
+        for player in self.players.values():
+            if player.score > self.best_score:
+                self.best_score = player.score
+
     def process_inputs(self):
+        for axis in self.axes.values():
+            axis.update()
+
         self.inputs['p1'] = self.axes['p1'].value * self.MAX_POWER
         self.inputs['p2'] = self.axes['p2'].value * self.MAX_POWER
 
@@ -248,15 +263,19 @@ class Game():
         text_timer_label = self.fonts['small'].render(f"TIMER", True, cols['timer'])
         text_p1 = self.fonts['medium'].render(f"{self.players['p1'].score:>10d}", True, dcols['p1'])
         text_p2 = self.fonts['medium'].render(f"{self.players['p2'].score:>10d}", True, dcols['p2'])
+        text_best = self.fonts['normal'].render(f"{self.best_score:<10d}", True, cols['best_score'])
         text_p1_label = self.fonts['small'].render(f"P1 SCORE", True, dcols['p1'])
         text_p2_label = self.fonts['small'].render(f"P2 SCORE", True, dcols['p2'])
+        text_best_label = self.fonts['small'].render(f"BEST SCORE", True, cols['best_score'])
         self.screen.blit(text_fps, (30, 30))
         self.screen.blit(text_p1, (self.screen_width - text_p1.get_width() - 30, 40))
         self.screen.blit(text_p2, (self.screen_width - text_p2.get_width() - 30, self.screen_height - 140))
+        self.screen.blit(text_best, ( 30, self.screen_center[1] - text_center(text_best)[1]))
         self.screen.blit(text_timer, (self.screen_width - text_timer.get_width() - 30, self.screen_center[1] - text_center(text_timer)[1]))
         self.screen.blit(text_timer_label, (self.screen_width - text_timer_label.get_width()-30, self.screen_center[1] - text_center(text_timer_label)[1]-60))
         self.screen.blit(text_p1_label, (self.screen_width - text_p1_label.get_width() - 30, 150))
         self.screen.blit(text_p2_label, (self.screen_width - text_p2_label.get_width() - 30, self.screen_height - 170))
+        self.screen.blit(text_best_label, (30, self.screen_center[1] - text_center(text_best_label)[1]-60))
 
         if self.state == GAMESTATE.PRE_INIT:
             text = self.fonts['big'].render(f"START", True, cols['hud'])
