@@ -34,7 +34,7 @@ class GAMESTATE(Enum):
 
 
 class Game():
-    def __init__(self, name: str, width: int, height: int, fps: int, sounds: dict, fonts: dict, images: dict, game_duration: float = 30., max_power: float = 18.):
+    def __init__(self, name: str, window_size: tuple[int, int] | None, fps: int, sounds: dict, fonts: dict, images: dict, game_duration: float = 30., max_power: float = 18.):
 
         self.fps = fps
         self.duration = game_duration
@@ -43,7 +43,14 @@ class Game():
         pygame.init()
         pygame.mouse.set_visible(False)
 
-        self.screen = pygame.display.set_mode((width, height))
+
+        if window_size is None:
+            screen_info = pygame.display.Info()
+            self.screen = pygame.display.set_mode((screen_info.current_w, screen_info.current_h), pygame.FULLSCREEN)
+        else:
+            self.screen = pygame.display.set_mode(window_size)
+
+
         pygame.display.set_caption(name)
         self.mixer = pygame.mixer
         self.mixer.init()
