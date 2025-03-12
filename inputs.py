@@ -31,6 +31,7 @@ class Axis():
         self.value = initial_value
         self.dead_zone = dead_zone
         self.normalization = normalization
+        self.device_type = 'joystick'
 
     def update(self):
         self.value = self.normalization(remove_dead_zone(self.source.get_axis(self.channel), self.dead_zone))
@@ -45,6 +46,7 @@ class KeysControl():
         self.key_intensity = key_intensity
         self.value = initial_value
         self.normalization = normalization
+        self.device_type = 'keyboard'
 
     def update(self):
         keys = self.source.get_pressed()
@@ -65,6 +67,7 @@ class IAControl:
     def __init__(self, initial_value = 0., normalization: Callable = lambda x: x):
         self.value = initial_value
         self.normalization = normalization
+        self.device_type = 'IA'
 
 
     def update(self):

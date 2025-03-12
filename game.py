@@ -87,12 +87,16 @@ class Game():
         try:
             with open(self.save_file_name, 'r') as arquivo_json:
                 data = json.load(arquivo_json)
-            if 'best_score' in data.keys():
+            if 'best_score' in data.keys() and 'best_score_device' in data.keys():
                 self.best_score = data['best_score']
+                self.best_score_device = data['best_score_device']
             else:
                 self.best_score = 0
+                self.best_score_device = None
+
         except:
             self.best_score = 0
+            self.best_score_device = None
 
 
         self.loop()
@@ -178,7 +182,7 @@ class Game():
         pass
 
     def save_to_file(self):
-        save = {'best_score': self.best_score}
+        save = {'best_score': self.best_score, 'best_score_device': self.best_score_device}
         with open(self.save_file_name, 'w') as arquivo_json:
             json.dump(save, arquivo_json)
 
@@ -215,6 +219,7 @@ class Game():
         for player in self.players.values():
             if player.score > self.best_score:
                 self.best_score = player.score
+                self.best_score_device = player.input.device_type
 
     def process_inputs(self):
         for axis in self.axes.values():
@@ -267,15 +272,17 @@ class Game():
         text_p1_label = self.fonts['small'].render(f"P1 SCORE", True, dcols['p1'])
         text_p2_label = self.fonts['small'].render(f"P2 SCORE", True, dcols['p2'])
         text_best_label = self.fonts['small'].render(f"BEST SCORE", True, cols['best_score'])
+        text_best_device = self.fonts['tiny'].render(f"{self.best_score_device}", True, cols['best_score'])
         self.screen.blit(text_fps, (30, 30))
         self.screen.blit(text_p1, (self.screen_width - text_p1.get_width() - 30, 40))
         self.screen.blit(text_p2, (self.screen_width - text_p2.get_width() - 30, self.screen_height - 140))
         self.screen.blit(text_best, ( 30, self.screen_center[1] - text_center(text_best)[1]))
         self.screen.blit(text_timer, (self.screen_width - text_timer.get_width() - 30, self.screen_center[1] - text_center(text_timer)[1]))
-        self.screen.blit(text_timer_label, (self.screen_width - text_timer_label.get_width()-30, self.screen_center[1] - text_center(text_timer_label)[1]-60))
+        self.screen.blit(text_timer_label, (self.screen_width - text_timer_label.get_width()-30, self.screen_center[1] - text_center(text_timer_label)[1]-50))
         self.screen.blit(text_p1_label, (self.screen_width - text_p1_label.get_width() - 30, 150))
         self.screen.blit(text_p2_label, (self.screen_width - text_p2_label.get_width() - 30, self.screen_height - 170))
-        self.screen.blit(text_best_label, (30, self.screen_center[1] - text_center(text_best_label)[1]-60))
+        self.screen.blit(text_best_label, (30, self.screen_center[1] - text_center(text_best_label)[1]-50))
+        self.screen.blit(text_best_device, (30, self.screen_center[1] - text_center(text_best_device)[1]+40))
 
         if self.state == GAMESTATE.PRE_INIT:
             text = self.fonts['big'].render(f"START", True, cols['hud'])

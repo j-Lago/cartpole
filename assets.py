@@ -12,6 +12,7 @@ sounds = {
 
 
 fonts = {
+    'tiny':   ('Consolas', 18),
     'small':   ('Consolas', 30),
     'normal':  ('Consolas', 70),
     'medium':  ('Consolas', 120),
