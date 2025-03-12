@@ -4,9 +4,14 @@ from player import Player, Cart
 from inputs import Axis
 import math
 import random
+from enum import Enum
+
+
 
 import os
 os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1'
+
+
 
 
 SCREEN_WIDTH, SCREEN_HEIGHT = 1600, 900
@@ -15,7 +20,7 @@ INPUT_STEP = 10
 DURATION = 30
 
 paused = False
-name = 'Controllab'
+name = 'CartPole'
 
 pygame.init()
 pygame.display.set_caption(name)
