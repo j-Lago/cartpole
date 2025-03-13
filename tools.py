@@ -5,6 +5,7 @@ import math
 def draw_center_mass(surface, pos, radius=15, colors=((255, 255, 255), (0, 0, 0))):
     pygame.draw.circle(surface, colors[0], pos, radius, draw_bottom_right=True, draw_top_left=True)
     pygame.draw.circle(surface, colors[1], pos, radius, draw_bottom_left=True, draw_top_right=True)
+    pygame.draw.circle(surface, colors[1], pos, radius, 1)
 
 
 def draw_particles(surface, color1, color2, pos, max_radius, density):

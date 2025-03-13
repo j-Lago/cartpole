@@ -1,4 +1,5 @@
 import pygame
+import pygame.gfxdraw
 import math
 from pendulo_tf import Pendulo
 import random
@@ -19,7 +20,7 @@ class Cart():
                  size = 30,
                  width = 4,
                  th0 = 0.,
-                 linear_factor=50,
+                 linear_factor= 50, #50,
                  force_factor = 1.,
                  alive=True,
                  ):
@@ -39,17 +40,20 @@ class Cart():
         self.x_tol = 60.
 
         self.alive = alive
+        self.ticks_since_death = 0
         self.cart_on_target = False
         self.pole_on_target = False
         self.steps_with_pole_on_target = 0
         self.steps_with_both_on_target = 0
         self.score = 0
+        self.reward = 0
 
         self.center_mass = 0.5
         self.last_input = 0.
         self.LINEAR_FACTOR = linear_factor
         self.FORCE_FACTOR = force_factor
-        self.model = Pendulo(1., 0.3, 5, x_damping=1, theta_damping=1, x0 = self.pos[0]/self.LINEAR_FACTOR, th0=th0, dt=1/60)
+        # self.model = Pendulo(1., 0.3, 5, x_damping=1, theta_damping=1, x0 = self.pos[0]/self.LINEAR_FACTOR, th0=th0, dt=1/60)
+        self.model = Pendulo(1., .3, 5, 1., 1., x0 = self.pos[0]/self.LINEAR_FACTOR, th0=th0, dt=1/60)
         self.jet = pygame.image.load("assets/jet.png")
         # self.particles_colors = ((90, 90, 60), (90, 60, 90))
         self.trace_particles_colors = ((90, 90, 60), (90, 60, 90))
@@ -88,23 +92,29 @@ class Cart():
 
     def step(self) -> bool:
         self.last_input = self.input.value
+        self.reward = 0
         if self.alive:
             self.model.step(self.input.value*self.FORCE_FACTOR)
             if not self.set_pos(x=self.model.y[0][0]*self.LINEAR_FACTOR):
                 self.alive = False
 
-        self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol and self.alive
-        self.pole_on_target = abs(math.fmod(self.model.theta - self.th_target, 2*math.pi)) < self.th_tol and self.alive
+            self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol and self.alive
+            self.pole_on_target = abs(math.fmod(self.model.theta - self.th_target, 2*math.pi)) < self.th_tol and self.alive
 
-        self.steps_with_pole_on_target = self.steps_with_pole_on_target + 1 if self.pole_on_target else 0
-        self.steps_with_both_on_target = self.steps_with_both_on_target  +1 if self.pole_on_target and self.cart_on_target else 0
+            self.steps_with_pole_on_target = self.steps_with_pole_on_target + 1 if self.pole_on_target else 0
+            self.steps_with_both_on_target = self.steps_with_both_on_target  +1 if self.pole_on_target and self.cart_on_target else 0
 
-        if self.steps_with_pole_on_target > 100:
-            self.score += 1 if self.steps_with_pole_on_target > 1000 else 2
+            if self.steps_with_pole_on_target > 100:
+                self.reward += 1 if self.steps_with_pole_on_target > 1000 else 2
 
-        if self.steps_with_both_on_target > 100:
-            self.score += 4 if self.steps_with_both_on_target > 1000 else 8
+            if self.steps_with_both_on_target > 100:
+                self.reward += 4 if self.steps_with_both_on_target > 1000 else 8
+        else:
+            self.reward = -1
+            self.ticks_since_death += 1
 
+        self.score += self.reward
+        self.score = max(self.score, 0)
         return self.alive
 
 
@@ -147,8 +157,8 @@ class Cart():
         l_intensity = max(-self.last_input*intensity_pixels_gain, 0.)
         jet_height = base_height * 2.75
 
-        l_image = pygame.transform.scale(pygame.transform.flip(self.jet, True, False), (l_intensity, jet_height))
-        r_image = pygame.transform.scale(self.jet, (r_intensity, jet_height))
+        l_image = pygame.transform.smoothscale(pygame.transform.flip(self.jet, True, False), (l_intensity, jet_height))
+        r_image = pygame.transform.smoothscale(self.jet, (r_intensity, jet_height))
 
         # pygame.draw.rect(self.surface, (255,0,0), (self.pos[0] + base_width//2, self.pos[1] - base_height//2, l_intensity, base_height), self.width)
         # pygame.draw.rect(self.surface, (255,0,0), (self.pos[0] - base_width//2-r_intensity, self.pos[1] - base_height//2, r_intensity, base_height), self.width)
@@ -176,7 +186,7 @@ class Cart():
 
 
 def draw_pole(surface: pygame.surface,
-              color: tuple[int,int,int],
+              color: tuple[int, int, int],
               pos: tuple[int, int] | list[int, int],
               theta: float,
               length: float,
@@ -187,8 +197,30 @@ def draw_pole(surface: pygame.surface,
 
     end_pos = (pos[0] + length * math.cos(theta), pos[1] + length * math.sin(theta))
 
-    pygame.draw.line(surface, color, pos, end_pos, width=width, )
+    # pygame.draw.line(surface, color, pos, end_pos, width=width)
+    draw_line_rect(surface, color, pos, end_pos, width=width)
     if center_mass is not None:
         mass_pos = (pos[0] + center_mass*length * math.cos(theta), pos[1] + center_mass*length * math.sin(theta))
         draw_center_mass(surface, mass_pos, colors=center_mass_colors)
 
+
+
+def draw_line_rect(surface, color, pos, end_pos, width):
+    y = float(end_pos[1] - pos[1])
+    x = float(end_pos[0] - pos[0])
+    h = math.sqrt(x**2 + y**2)
+
+    cos_th = x / h
+    sin_th = y / h
+    w2 = width/2
+
+    points = (
+        (pos[0] + w2 * sin_th, pos[1] - w2 * cos_th),
+        (pos[0] - w2 * sin_th, pos[1] + w2 * cos_th),
+        (pos[0] - w2 * sin_th + x, pos[1] + w2 * cos_th + y),
+        (pos[0] + w2 * sin_th + x, pos[1] - w2 * cos_th + y),
+
+    )
+
+    pygame.gfxdraw.filled_polygon(surface, points, color)
+    pygame.gfxdraw.aapolygon(surface, points, color)

@@ -11,6 +11,7 @@ import assets
 from assets import colors as cols
 from tools import lerp_v3
 import json
+from copy import copy, deepcopy
 
 
 import os
@@ -26,13 +27,15 @@ class GAMESTATE(Enum):
 
 
 class Game():
-    def __init__(self, name: str, window_size: tuple[int, int] | None, fps: int, sounds: dict, fonts: dict, images: dict, game_duration: float = 30., max_power: float = 18., save_file: str = 'meta/save.json', DO_NOT_RENDER: bool = False):
+    def __init__(self, name: str, window_size: tuple[int, int] | None, fps: int, sounds: dict, fonts: dict, images: dict, game_duration: float = 30., max_power: float = 18., save_file: str = 'meta/save.json', DO_NOT_RENDER: bool = False, STEP_BY_STEP: bool = False):
 
         self.fps = fps
         self.duration = game_duration
         self.MAX_POWER = max_power
         self.save_file_name =  save_file
         self.DO_NOT_RENDER = DO_NOT_RENDER
+        self.STEP_BY_STEP = STEP_BY_STEP
+        self.screen_shake_disable = True
 
         pygame.init()
         pygame.mouse.set_visible(False)
@@ -99,8 +102,9 @@ class Game():
             self.best_score = 0
             self.best_score_device = None
 
-
-        self.loop()
+        self.pre_init()
+        if not self.STEP_BY_STEP:
+            self.loop()
 
     def reset(self):
         self.clock = pygame.time.Clock()
@@ -113,35 +117,57 @@ class Game():
                 'target_p1': Cart(self.screen, None, (self.screen_center[0]     , int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi, alive=False),
                 'target_p2': Cart(self.screen, None, (self.screen_center[0]     , int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi, alive=False),
             }
-        if not self.DO_NOT_RENDER:
+        if not self.DO_NOT_RENDER and not self.STEP_BY_STEP:
             self.players = {
-                'p1'       : Cart(self.screen, self.axes['p1'], (self.screen_width * 2 // 3, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1, force_factor=self.MAX_POWER),
-                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1, force_factor=self.MAX_POWER),
+                'p1'       : Cart(self.screen, self.axes['p1'], (self.screen_width * 2 // 3, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi*0+random.random()*.1, force_factor=self.MAX_POWER),
+                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi*0+random.random()*.1, force_factor=self.MAX_POWER),
             }
         else:
             self.players = {
-                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi+random.random()*.1, force_factor=self.MAX_POWER),
+                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi*0+random.random()*.1, force_factor=self.MAX_POWER),
             }
 
         for axis in self.axes.values():
             axis.value  = 0.
 
-
         pygame.event.clear()
 
+
+    def inc_time(self):
+        if self.state == GAMESTATE.RUN:
+            self.time += 1/self.fps  # não usar o tempo real do sistema permite acelerar simulação para treinamento
+            if self.time > self.duration:
+                self.timeout()
+
+    def step(self, axis_input):
+        if self.state == GAMESTATE.PRE_INIT:
+            self.pre_init()
+        self.inc_time()
+        for key, player in self.players.items():
+            player.input.value = axis_input * self.MAX_POWER
+            print(player.input.value)
+        self.simulate()
+
+        if self.all_dead():
+            self.game_over()
+
+        if (self.state == GAMESTATE.RUN or self.state == GAMESTATE.PRE_INIT) and not self.DO_NOT_RENDER:
+            self.draw()
+
+        if not self.DO_NOT_RENDER:
+            pygame.display.flip()
+            self.clock.tick(self.fps)
 
     def loop(self):
         while True:
 
             if self.state == GAMESTATE.RUN:
-                self.time += 1/self.fps  # não usar o tempo real do sistema permite acelerar simulação para treinamento
-                if self.time > self.duration:
-                    self.timeout()
+                self.inc_time()
 
-                all_alive = True
+                all_dead = True
                 for player in self.players.values():
-                    all_alive = all_alive and player.alive
-                if not all_alive:
+                    all_dead = all_dead and not player.alive
+                if all_dead:
                     self.game_over()
             else:
                 self.paused_time += 1/self.fps
@@ -165,6 +191,7 @@ class Game():
                     keys = pygame.key.get_pressed()
                     if keys[pygame.K_RETURN]: self.pause()
                     if keys[pygame.K_ESCAPE]: self.reset()
+                    if keys[pygame.K_k]: self.screen_shake_disable = not self.screen_shake_disable
 
 
             if self.state == GAMESTATE.RUN:
@@ -193,7 +220,8 @@ class Game():
         return self.screen.get_height()
 
     def pre_init(self):
-        pass
+        if self.STEP_BY_STEP:
+            self.state = GAMESTATE.RUN
 
     def save_to_file(self):
         save = {'best_score': self.best_score, 'best_score_device': self.best_score_device}
@@ -252,11 +280,15 @@ class Game():
 
     def simulate(self):
         for key, player in self.players.items():
-            if player.alive:
-                player.step()
-                if not player.alive and not self.DO_NOT_RENDER:
-                    self.sounds['death'].play()
+            player.step()
+            if not player.alive and player.ticks_since_death == 0 and not self.DO_NOT_RENDER:
+                self.sounds['death'].play()
 
+    def all_dead(self) -> bool:
+        all_dead = True
+        for player in self.players.values():
+            all_dead = all_dead and not player.alive
+        return all_dead
 
 
     def process_sounds(self):
@@ -287,7 +319,11 @@ class Game():
         text_fps = self.fonts['small'].render(f"{fps:.1f}", True, cols['hud'])
         text_timer = self.fonts['normal'].render(f"{self.duration-self.time:.1f}", True, cols['timer'])
         text_timer_label = self.fonts['small'].render(f"TIMER", True, cols['timer'])
-        text_p1 = self.fonts['medium'].render(f"{self.players['p1'].score:>10d}", True, dcols['p1'])
+        if 'p1' in self.players.keys():
+            text_p1 = self.fonts['medium'].render(f"{self.players['p1'].score:>10d}", True, dcols['p1'])
+        else:
+            dcols['p1'] = (60, 60, 50)
+            text_p1 = self.fonts['medium'].render(f"{0:>10d}", True, dcols['p1'])
         text_p2 = self.fonts['medium'].render(f"{self.players['p2'].score:>10d}", True, dcols['p2'])
         text_best = self.fonts['normal'].render(f"{self.best_score:<10d}", True, cols['best_score'])
         text_p1_label = self.fonts['small'].render(f"P1 SCORE", True, dcols['p1'])
@@ -305,10 +341,22 @@ class Game():
         self.screen.blit(text_best_label, (30, self.screen_center[1] - text_center(text_best_label)[1]-50))
         self.screen.blit(text_best_device, (30, self.screen_center[1] - text_center(text_best_device)[1]+40))
 
+
         if self.state == GAMESTATE.PRE_INIT:
             text = self.fonts['big'].render(f"START", True, cols['hud'])
             self.screen.blit(text, (self.screen_center[0] - text_center(text)[0], self.screen_center[1] - text_center(text)[1]))
 
+        if self.screen_shake_disable and self.state == GAMESTATE.RUN and not self.all_dead():
+                shake = 0.
+                for player in self.players.values():
+                    if player.alive:
+                        shake += abs(player.input.value)
+                    elif player.ticks_since_death < 0.2 * self.fps:
+                        shake += 10
+                shake = shake / len(self.players) * 5
+                screen = copy(self.screen)
+                self.screen.fill(cols['bg'])
+                self.screen.blit(screen, (random.random()*shake, random.random()*shake))
 
 def load_sounds(description: dict) -> dict:
     return {k: pygame.mixer.Sound(v) for k, v in description.items()}

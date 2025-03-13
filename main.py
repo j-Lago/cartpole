@@ -10,5 +10,5 @@ if __name__ == '__main__':
                 assets.images,
                 40,
                 18,
-                DO_NOT_RENDER = False)
+                )
     
