@@ -69,8 +69,8 @@ class Game():
         if key in self.joysticks.keys():
             self.axes[key] = Axis(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
-            # self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
-            self.axes[key] = IAControl()
+            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
+            # self.axes[key] = IAControl()
 
 
         # assets
@@ -316,7 +316,7 @@ class Game():
 
 
         fps = self.clock.get_fps()
-        text_fps = self.fonts['small'].render(f"{fps:.1f}", True, cols['hud'])
+        text_fps = self.fonts['small'].render(f"{fps:.1f}", True, cols['fps'])
         text_timer = self.fonts['normal'].render(f"{self.duration-self.time:.1f}", True, cols['timer'])
         text_timer_label = self.fonts['small'].render(f"TIMER", True, cols['timer'])
         if 'p1' in self.players.keys():
@@ -347,16 +347,20 @@ class Game():
             self.screen.blit(text, (self.screen_center[0] - text_center(text)[0], self.screen_center[1] - text_center(text)[1]))
 
         if self.screen_shake_disable and self.state == GAMESTATE.RUN and not self.all_dead():
-                shake = 0.
+                shake_abs = 0.
+                shake_dir = 0.
                 for player in self.players.values():
                     if player.alive:
-                        shake += abs(player.input.value)
+                        shake_dir += player.input.value
+                        shake_abs += abs(player.input.value)*(random.random()-0.5)
                     elif player.ticks_since_death < 0.2 * self.fps:
-                        shake += 10
-                shake = shake / len(self.players) * 5
+                        shake_dir += 10 * (-1 if player.pos[0] < self.screen_center[0] else 1)
+                        shake_abs += 10 * (random.random()-0.5)
+                shake_x = shake_dir / len(self.players) * 9
+                shake_y = shake_abs / len(self.players) * 9
                 screen = copy(self.screen)
                 self.screen.fill(cols['bg'])
-                self.screen.blit(screen, (random.random()*shake, random.random()*shake))
+                self.screen.blit(screen, (random.random()*shake_x, random.random()*shake_y))
 
 def load_sounds(description: dict) -> dict:
     return {k: pygame.mixer.Sound(v) for k, v in description.items()}
