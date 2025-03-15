@@ -1,6 +1,6 @@
 import math
 import random
-from random import random as rand, randint, uniform
+from random import random as rand, randint, uniform, choice
 import pygame
 
 class Particle():
@@ -44,7 +44,7 @@ class Particle():
         if self.ticks * self.dt > self.lifetime:
             self.alive = False
 
-class Ball(Particle):
+class BallParticle(Particle):
     def __init__(self, surface, color, radius, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.color = color
@@ -52,15 +52,23 @@ class Ball(Particle):
         self.radius = radius
 
     def draw(self):
-        pygame.draw.circle(self.surface, self.color, (particle.x, -self.y), self.radius)
+        pygame.draw.circle(self.surface, self.color, (self.x, -self.y), self.radius)
 
 
+class TextParticle(Particle):
+    def __init__(self, surface, color, text, font, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.color = color
+        self.surface = surface
+        self.text = text
+        self.font = font
 
-if __name__ == '__main__':
+    def draw(self):
+        text = self.font.render(self.text, True, self.color)
+        self.surface.blit(text, (self.x, -self.y))
 
-    spawn_every_n_ticks = (1, 5)
-    particles_per_spawn = (1, 200)
-    lifetime = (1.0, 4.0)
+
+def example(spawn_every_n_ticks = (1,2), particles_per_spawn = (1,2), lifetime = (1,2), particle_type=BallParticle):
     window_size = (900, 600)
     fps = 60
 
@@ -75,10 +83,15 @@ if __name__ == '__main__':
     clock = pygame.time.Clock()
 
     font = pygame.font.SysFont('Consolas', 22)
+    small_font = pygame.font.SysFont('Consolas', 18)
 
-    def random_ball():
-        return Ball(screen, (randint(0,255), randint(0,255), randint(0,255)), randint(1,2), pos=(w//2, h*0.9), vel=((rand()-0.5)*w/4, rand()*h/4+h/5), dt=1/fps, lifetime=uniform(lifetime[0], lifetime[1]), linear_factor=1000 )
-
+    def random_particle(particle_type):
+        if particle_type == BallParticle:
+            return BallParticle(screen, (randint(0,255), randint(0,255), randint(0,255)), randint(1,2), pos=(w//2, h*0.9), vel=((rand()-0.5)*w/4, rand()*h/4+h/5), dt=1/fps, lifetime=uniform(lifetime[0], lifetime[1]), linear_factor=1000 )
+        elif particle_type == TextParticle:
+            return TextParticle(screen, (randint(0, 255), randint(0, 255), randint(0, 255)), f'{randint(-100, 100):+d}', small_font, pos=(w // 2, h * 0.9), vel=((rand() - 0.5) * w / 4, rand() * h / 4 + h / 5), dt=1 / fps, lifetime=uniform(lifetime[0], lifetime[1]), linear_factor=1000)
+        else:
+            assert False
     particles = []
 
     ticks = 0
@@ -87,7 +100,7 @@ if __name__ == '__main__':
         ticks += 1
         if ticks % randint(*spawn_every_n_ticks) == 0:
             for _ in range(randint(*particles_per_spawn)):
-                particles.append(random_ball())
+                particles.append(random_particle(particle_type))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -110,3 +123,8 @@ if __name__ == '__main__':
         clock.tick(fps)
 
     pygame.quit()
+
+
+if __name__ == '__main__':
+    # example(spawn_every_n_ticks=(1, 5), particles_per_spawn=(1, 200), lifetime=(1.0, 4.0))
+    example(spawn_every_n_ticks=(20, 30), particles_per_spawn=(1, 4), lifetime=(4.0, 6.0), particle_type=TextParticle)
