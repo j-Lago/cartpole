@@ -1,6 +1,6 @@
 import math
 import random
-from random import random as rand, randint
+from random import random as rand, randint, uniform
 import pygame
 
 class Particle():
@@ -57,39 +57,54 @@ class Ball(Particle):
 
 
 if __name__ == '__main__':
-    pygame.init()
-    screen = pygame.display.set_mode((900, 600))
-    fps = 60
-    clock = pygame.time.Clock()
-    ticks = 0
 
-    w, h = screen.get_width(), screen.get_height()
+    spawn_every_n_ticks = (1, 5)
+    particles_per_spawn = (1, 200)
+    lifetime = (1.0, 4.0)
+    window_size = (900, 600)
+    fps = 60
+
+    pygame.init()
+    if window_size is None:
+        screen_info = pygame.display.Info()
+        screen = pygame.display.set_mode((screen_info.current_w, screen_info.current_h), pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode(window_size)
+
+    w, h = (screen.get_width(), screen.get_height())
+    clock = pygame.time.Clock()
+
+    font = pygame.font.SysFont('Consolas', 22)
 
     def random_ball():
-        s = 1 if rand() > 0.5 else -1
-        return Ball(screen, (randint(0,255), randint(0,255), randint(0,255)), 1, pos=(w//2, h*0.9), vel=((rand()-0.5)*w/5, rand()*h/5+h/5), dt=1/fps, lifetime=3, linear_factor=1000 )
+        return Ball(screen, (randint(0,255), randint(0,255), randint(0,255)), randint(1,2), pos=(w//2, h*0.9), vel=((rand()-0.5)*w/4, rand()*h/4+h/5), dt=1/fps, lifetime=uniform(lifetime[0], lifetime[1]), linear_factor=1000 )
 
     particles = []
 
-
+    ticks = 0
     running = True
-
     while running:
         ticks += 1
-        if ticks % randint(1,5) == 0:
-            for _ in range(randint(1,10)):
+        if ticks % randint(*spawn_every_n_ticks) == 0:
+            for _ in range(randint(*particles_per_spawn)):
                 particles.append(random_ball())
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-        screen.fill((20, 20, 20))
+        screen.fill((0, 0, 0))
         for particle in particles:
             particle.draw()
             particle.step()
 
         particles = [x for x in particles if x.alive]
+
+        text_len = font.render(f"particles: {len(particles)}", True, (180, 150, 60))
+        screen.blit(text_len, (20, 20))
+
+        text_fps = font.render(f"fps: {clock.get_fps():.1f}", True, (180, 150, 60))
+        screen.blit(text_fps, (20, 46))
 
         pygame.display.flip()
         clock.tick(fps)
