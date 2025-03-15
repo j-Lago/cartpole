@@ -40,12 +40,14 @@ class Cart():
         self.x_tol = 60.
 
         self.alive = alive
+        self.ticks = 0
         self.ticks_since_death = 0
         self.cart_on_target = False
         self.pole_on_target = False
         self.steps_with_pole_on_target = 0
         self.steps_with_both_on_target = 0
         self.score = 0
+        self.uncollected_score = 0
         self.reward = 0
 
         self.center_mass = 0.5
@@ -89,6 +91,10 @@ class Cart():
     #         pygame.draw.line(self.surface, self.color, (self.pos[0] + self.size[0] // 3, self.pos[1]), (self.pos[0], self.pos[1] + self.size[1] // 3),  width=self.width)
     #         pygame.draw.line(self.surface, self.color, (self.pos[0], self.pos[1] - self.size[1] // 3), (self.pos[0] - self.size[0] // 3, self.pos[1]),  width=self.width)
 
+    def collect_score(self):
+        x = self.uncollected_score
+        self.uncollected_score = 0
+        return x
 
     def step(self) -> bool:
         self.last_input = self.input.value
@@ -98,7 +104,7 @@ class Cart():
             if not self.set_pos(x=self.model.y[0][0]*self.LINEAR_FACTOR):
                 self.alive = False
 
-            self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol and self.alive
+            self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol*10 and self.alive
             self.pole_on_target = abs(math.fmod(self.model.theta - self.th_target, 2*math.pi)) < self.th_tol and self.alive
 
             self.steps_with_pole_on_target = self.steps_with_pole_on_target + 1 if self.pole_on_target else 0
@@ -109,11 +115,13 @@ class Cart():
 
             if self.steps_with_both_on_target > 100:
                 self.reward += 4 if self.steps_with_both_on_target > 1000 else 8
+            self.ticks += 1
         else:
             self.reward = -1
             self.ticks_since_death += 1
 
         self.score += self.reward
+        self.uncollected_score += self.reward
         self.score = max(self.score, 0)
         return self.alive
 
@@ -126,6 +134,12 @@ class Cart():
 
                 self.input.source.rumble(l*.05, r, 100)
 
+
+    @property
+    def pole_tip_pos(self):
+        x = self.pos[0] + self.size[0] * math.sin(self.model.theta)
+        y = self.pos[1] + self.size[0] * math.cos(self.model.theta)
+        return x, y
 
     def draw(self):
         base_width = self.size[0]
@@ -169,9 +183,8 @@ class Cart():
             for i, pos in enumerate(self.trace):
                 draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos, int(12 * i / self.N_trace), int(2 + 10 * i / 120))
 
-
         if self.pole_on_target:
-            draw_pole(self.surface, highlight_color, self.pos, -self.model.theta+math.pi/2, pole_length, 14, center_mass=self.center_mass, center_mass_colors=center_mass_colors)
+            draw_pole(self.surface, highlight_color, self.pos, -self.model.theta+math.pi/2, pole_length+3, 14, center_mass=self.center_mass, center_mass_colors=center_mass_colors)
             th = -self.model.theta+math.pi/2
             start = self.pos
             end = (start[0]+pole_length*math.cos(th), start[1]+pole_length*math.sin(th))

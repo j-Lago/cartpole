@@ -12,7 +12,7 @@ from assets import colors as cols
 from tools import lerp_v3
 import json
 from copy import copy, deepcopy
-
+from particle import TextParticle, BallParticle
 
 import os
 os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1'
@@ -36,6 +36,7 @@ class Game():
         self.DO_NOT_RENDER = DO_NOT_RENDER
         self.STEP_BY_STEP = STEP_BY_STEP
         self.screen_shake_disable = True
+
 
         pygame.init()
         pygame.mouse.set_visible(False)
@@ -83,8 +84,10 @@ class Game():
         self.time = None
         self.paused_time = None
         self.state = None
+        self.npcs = dict()
         self.players = dict()
         self.inputs = dict()
+        self.particles = []
         # -- reset --------------------------------------
         self.reset()
 
@@ -107,6 +110,7 @@ class Game():
             self.loop()
 
     def reset(self):
+        self.particles = []
         self.clock = pygame.time.Clock()
         self.time = 0.
         self.paused_time = 0.
@@ -128,7 +132,7 @@ class Game():
             }
 
         for axis in self.axes.values():
-            axis.value  = 0.
+            axis.value = 0.
 
         pygame.event.clear()
 
@@ -279,10 +283,45 @@ class Game():
             self.inputs[key] = self.axes[key].value * self.MAX_POWER
 
     def simulate(self):
+        time_to_collect = 10
+        collect_shift = 0
         for key, player in self.players.items():
+            collect_shift += time_to_collect // 2
             player.step()
             if not player.alive and player.ticks_since_death == 0 and not self.DO_NOT_RENDER:
                 self.sounds['death'].play()
+            if not self.DO_NOT_RENDER:
+                uncollected_score = player.uncollected_score
+                if player.alive and (player.ticks+collect_shift) % time_to_collect == 0 and uncollected_score > 0:
+                    collected = player.collect_score()
+                    self.particles.append(
+                        TextParticle(self.screen,
+                                     (220, 200, 60),
+                                     f'+{collected}',
+                                     self.fonts['particles'],
+                                     pos=player.pole_tip_pos,
+                                     vel=((random.random() - 0.5) * 200, random.random() * 100 + 100),
+                                     dt=1/self.fps,
+                                     lifetime=random.uniform(0.5,1.5),
+                                     linear_factor=1000)
+                    )
+                    for _ in range(random.randint(10, 20)):
+                        self.particles.append(
+                            BallParticle(self.screen,
+                                         (random.randint(5,250), random.randint(5,250), random.randint(5,250)),
+                                         1,
+                                         pos=player.pole_tip_pos,
+                                         vel=((random.random() - 0.5) * 400, random.random() * 100 + 100),
+                                         dt=1 / self.fps,
+                                         lifetime=random.uniform(0.5, 1.5),
+                                         linear_factor=1000)
+                        )
+                    self.sounds['coin'].play()
+
+        for particle in self.particles:
+            particle.step()
+        self.particles = [x for x in self.particles if x.alive]
+
 
     def all_dead(self) -> bool:
         all_dead = True
@@ -310,6 +349,9 @@ class Game():
 
         for player in self.players.values():
             player.draw()
+
+        for particle in self.particles:
+            particle.draw()
 
 
         dcols = { key: cols[key] if self.players[key].alive else lerp_v3(cols[key], (60, 60, 50), 0.85) for key in self.players.keys()}
@@ -363,7 +405,12 @@ class Game():
                 self.screen.blit(screen, (random.random()*shake_x, random.random()*shake_y))
 
 def load_sounds(description: dict) -> dict:
-    return {k: pygame.mixer.Sound(v) for k, v in description.items()}
+    sounds = {}
+    for k, v in description.items():
+        sound = pygame.mixer.Sound(v[0])
+        sound.set_volume(v[1])
+        sounds[k] = sound
+    return sounds
 
 
 def load_fonts(description: dict) -> dict:
