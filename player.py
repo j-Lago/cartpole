@@ -108,13 +108,13 @@ class Cart():
             self.pole_on_target = abs(math.fmod(self.model.theta - self.th_target, 2*math.pi)) < self.th_tol and self.alive
 
             self.steps_with_pole_on_target = self.steps_with_pole_on_target + 1 if self.pole_on_target else 0
-            self.steps_with_both_on_target = self.steps_with_both_on_target  +1 if self.pole_on_target and self.cart_on_target else 0
+            self.steps_with_both_on_target = self.steps_with_both_on_target + 1 if self.pole_on_target and self.cart_on_target else 0
 
-            if self.steps_with_pole_on_target > 100:
-                self.reward += 1 if self.steps_with_pole_on_target > 1000 else 2
+            if self.steps_with_pole_on_target > 60:
+                self.reward += 1 if self.steps_with_pole_on_target < 60*3 else 2
 
-            if self.steps_with_both_on_target > 100:
-                self.reward += 4 if self.steps_with_both_on_target > 1000 else 8
+            if self.steps_with_both_on_target > 60:
+                self.reward += 2 if self.steps_with_both_on_target < 60*3 else 6
             self.ticks += 1
         else:
             self.reward = -1
@@ -161,7 +161,7 @@ class Cart():
 
         if self.cart_on_target and self.pole_on_target:
             pygame.draw.rect(self.surface, highlight_color, (self.pos[0] - base_width//2 - 2, self.pos[1] - base_height//2 - 2, base_width+4, base_height+4), self.width+2)
-            draw_path_particles(self.surface, self.highlight_particles_colors[0], self.highlight_particles_colors[1], (self.pos[0] - base_width//2 - 2, self.pos[1]), (self.pos[0] + base_width//2 - 2, self.pos[1]), (base_height)//2, 30)
+            draw_path_particles(self.surface, self.highlight_particles_colors[0], self.highlight_particles_colors[1], (self.pos[0] - base_width//2 - 2, self.pos[1]), (self.pos[0] + base_width//2 - 2, self.pos[1]), (base_height)//2, 20)
 
         pygame.draw.rect(self.surface, color, (self.pos[0] - base_width//2, self.pos[1] - base_height//2, base_width, base_height))
 

@@ -110,6 +110,9 @@ class Game():
             self.loop()
 
     def reset(self):
+        self.mixer.quit()
+        self.mixer = pygame.mixer
+        self.mixer.init()
         self.particles = []
         self.clock = pygame.time.Clock()
         self.time = 0.
@@ -295,7 +298,8 @@ class Game():
                 uncollected_score = player.uncollected_score
                 if player.alive and (player.ticks+collect_shift) % time_to_collect == 0 and uncollected_score > 0:
                     collected = player.collect_score()
-                    color = cols['small_collect'] if collected < 50 else cols['big_collect']
+                    vel_y = 90
+                    color = cols['small_collect'] if collected <= 25 else cols['big_collect']
                     color = lerp_v3(color, (random.randint(5,250), random.randint(5,250), random.randint(5,250)), random.random()*0.1 + 0.1 )
                     self.particles.append(
                         TextParticle(self.screen,
@@ -303,7 +307,7 @@ class Game():
                                      f'+{collected}',
                                      self.fonts['particles'],
                                      pos=player.pole_tip_pos,
-                                     vel=((random.random() - 0.5) * 200, random.random() * 100 + 100),
+                                     vel=((random.random() - 0.5) * 200, random.random() * vel_y + vel_y),
                                      dt=1/self.fps,
                                      lifetime=random.uniform(0.5,1.5),
                                      linear_factor=1000)
@@ -314,7 +318,7 @@ class Game():
                                          (random.randint(5,250), random.randint(5,250), random.randint(5,250)),
                                          1,
                                          pos=player.pole_tip_pos,
-                                         vel=((random.random() - 0.5) * 400, random.random() * 100 + 100),
+                                         vel=((random.random() - 0.5) * 300, random.random() * vel_y + vel_y),
                                          dt=1 / self.fps,
                                          lifetime=random.uniform(0.5, 1.5),
                                          linear_factor=1000)
