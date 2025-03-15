@@ -37,7 +37,7 @@ class Cart():
         self.th_target = math.pi
         self.th_tol = math.radians(30.)
         self.x_target = self.surface.get_width() / 2
-        self.x_tol = 60.
+        self.x_tol = 100.
 
         self.alive = alive
         self.ticks = 0
@@ -104,7 +104,7 @@ class Cart():
             if not self.set_pos(x=self.model.y[0][0]*self.LINEAR_FACTOR):
                 self.alive = False
 
-            self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol*10 and self.alive
+            self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol and self.alive
             self.pole_on_target = abs(math.fmod(self.model.theta - self.th_target, 2*math.pi)) < self.th_tol and self.alive
 
             self.steps_with_pole_on_target = self.steps_with_pole_on_target + 1 if self.pole_on_target else 0

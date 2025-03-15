@@ -285,6 +285,7 @@ class Game():
     def simulate(self):
         time_to_collect = 10
         collect_shift = 0
+        play_sound_for_collected_score = False
         for key, player in self.players.items():
             collect_shift += time_to_collect // 2
             player.step()
@@ -294,9 +295,11 @@ class Game():
                 uncollected_score = player.uncollected_score
                 if player.alive and (player.ticks+collect_shift) % time_to_collect == 0 and uncollected_score > 0:
                     collected = player.collect_score()
+                    color = cols['small_collect'] if collected < 50 else cols['big_collect']
+                    color = lerp_v3(color, (random.randint(5,250), random.randint(5,250), random.randint(5,250)), random.random()*0.1 + 0.1 )
                     self.particles.append(
                         TextParticle(self.screen,
-                                     (220, 200, 60),
+                                     color,
                                      f'+{collected}',
                                      self.fonts['particles'],
                                      pos=player.pole_tip_pos,
@@ -316,7 +319,10 @@ class Game():
                                          lifetime=random.uniform(0.5, 1.5),
                                          linear_factor=1000)
                         )
-                    self.sounds['coin'].play()
+                    play_sound_for_collected_score = True
+
+        if play_sound_for_collected_score:
+            self.sounds['coin'].play()
 
         for particle in self.particles:
             particle.step()
