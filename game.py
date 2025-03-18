@@ -381,6 +381,7 @@ class Game():
             self.inputs[key] = self.axes[key].value * self.MAX_POWER
 
         if self.state == GAMESTATE.RUN:
+            self.inc_time()
             self.simulate()
 
         if not self.DO_NOT_RENDER:
