@@ -52,10 +52,8 @@ class Game():
         self.screen_shake_disable = True
         self.MAX_PARTICLES = 1000
 
-
         pygame.init()
         pygame.mouse.set_visible(False)
-
 
         if window_size is None:
             screen_info = pygame.display.Info()
@@ -64,7 +62,6 @@ class Game():
             self.screen = pygame.display.set_mode(window_size)
 
         self.last_screen = copy(self.screen)
-
 
         pygame.display.set_caption(name)
         self.mixer = pygame.mixer
@@ -90,7 +87,6 @@ class Game():
             # self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
             self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
             # self.axes[key] = IAControl()
-
 
         # assets
         self.sounds = load_sounds(sounds)
@@ -189,7 +185,6 @@ class Game():
         pygame.event.clear()
         self.clear_popups()
 
-
     def inc_time(self):
         if self.state == GAMESTATE.RUN:
             self.time += 1/self.fps  # não usar o tempo real do sistema permite acelerar simulação para treinamento
@@ -198,9 +193,6 @@ class Game():
                 self.bars['timer'].active = False
 
             self.bars['timer'].value = max((self.duration - self.time) / self.duration, 0.)
-
-    def step(self, axis_input):
-        raise NotImplementedError
 
     def loop(self):
         while True:
@@ -359,15 +351,8 @@ class Game():
         else:
             self.reset()
 
-
         for player in self.players.values():
             player.paused = True if self.state == GAMESTATE.PAUSED else False
-
-
-
-
-
-
 
     def save_score(self):
         print(f'{self.state} (', end='')
@@ -386,6 +371,28 @@ class Game():
             axis.update()
         for key, player in self.players.items():
             self.inputs[key] = self.axes[key].value * self.MAX_POWER
+
+    def ia_step(self, input_key_value: dict) -> bool:   # ex: {'p2': -0.78}
+        """
+        Para uso exclusivo do treinamento da IA
+        """
+        for key, value in input_key_value.items():
+            self.axes[key].value = value
+            self.inputs[key] = self.axes[key].value * self.MAX_POWER
+
+        if self.state == GAMESTATE.RUN:
+            self.simulate()
+
+        if not self.DO_NOT_RENDER:
+            self.draw()
+            pygame.display.flip()
+            self.clock.tick(self.fps)
+
+        all_alive = True
+        for key, value in input_key_value.items():
+            all_alive = all_alive and self.players[key].alive
+
+        return not all_alive
 
     def simulate(self):
         f = 60 / self.fps
@@ -438,8 +445,9 @@ class Game():
                         )
                     play_sound_for_collected_score = True
 
-        if play_sound_for_collected_score:
-            self.sounds['coin'].play()
+        if not self.DO_NOT_RENDER:
+            if play_sound_for_collected_score:
+                self.sounds['coin'].play()
 
         if self.state != GAMESTATE.PAUSED:
             self.particles.step()

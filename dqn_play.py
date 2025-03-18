@@ -1,8 +1,5 @@
-import numpy as np
-import matplotlib.pyplot as plt
 from itertools import count
 import torch
-import time
 from pytorch_game import ptGame, DQN, get_dims_from_weights
 import assets
 
@@ -23,7 +20,7 @@ def load_and_play(weights_path):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f'device: {device}')
 
-    weights = torch.load(weights_path)
+    weights = torch.load(weights_path, weights_only=True)
     dims = get_dims_from_weights(weights)
     print(f"weights loaded from '{weights_path}': net dims: {dims}")
 
@@ -32,6 +29,7 @@ def load_and_play(weights_path):
 
     for episode in count():
         state = game.reset_system()
+        print(f'{episode=}')
         done = False
         while not done:
             action = police_net(state).argmax(dim=1).to(device)
@@ -40,4 +38,4 @@ def load_and_play(weights_path):
 
 
 if __name__ == '__main__':
-    load_and_play('pendulo_trained_12.pth')
+    load_and_play('meta/pendulo_trained_12.pth')

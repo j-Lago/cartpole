@@ -1,7 +1,7 @@
 import pygame
 import pygame.gfxdraw
 import math
-from pendulo_tf import Pendulo
+from pendulo import Pendulo
 import random
 from _collections import deque
 from inputs import Axis, KeysControl

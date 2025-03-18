@@ -15,8 +15,7 @@ class ptGame(Game):
                           model.y[1][0], model.y[1][1],
                           model.y[2][0], model.y[2][1],
                           model.y[3][0], model.y[3][1]])
-        return torch.Tensor(torch.tensor([state], dtype=torch.float))
-
+        return torch.Tensor(torch.tensor(np.array([state]), dtype=torch.float))
 
     def reset_system(self):
         self.steps_count = 0
@@ -24,22 +23,17 @@ class ptGame(Game):
         self.state = GAMESTATE.RUN
         return self.get_state()
 
-
     def simulate_system(self, action, verbose=0):
         self.steps_count += 1
         axis_input = (0., 1., -1., 0.5, -0.5)[action]
-        self.step(axis_input)
-        done = not self.state == GAMESTATE.RUN
+        done = self.ia_step({'p2': axis_input})
         reward = self.players[self.player_key].reward
         score = self.players[self.player_key].score
         if done and verbose == 2:
             print(f'{self.state}, score: {score}')
 
-
-
         if verbose == 1:
             print(f'{self.steps_count=}, {axis_input=} -> {reward=}')
-
 
         reward = torch.tensor([reward], dtype=torch.float)
         next_state = self.get_state()
