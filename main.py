@@ -10,5 +10,6 @@ if __name__ == '__main__':
                 assets.images,
                 45,
                 18,
+                training_mode=False,
                 )
     

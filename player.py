@@ -8,23 +8,23 @@ from inputs import Axis, KeysControl
 from tools import draw_center_mass, draw_particles, draw_path_particles, lerp, lerp_v2, lerp_v3, get_direction
 
 
-
 class Cart():
     def __init__(self,
                  surface,
                  controller: Axis | KeysControl,
                  pos=(0., 0.),
                  color=(255, 255, 255),
-                 center_mass_colors = ( (255,)*3, (0,)*3 ),
-                 selected = False,
-                 size = 30,
-                 width = 4,
-                 th0 = 0.,
-                 linear_factor= 50, #50,
-                 force_factor = 1.,
-                 fuel_factor = 0.001,
+                 center_mass_colors=((255,) * 3, (0,) * 3),
+                 selected=False,
+                 size=30,
+                 width=4,
+                 th0=0.,
+                 linear_factor=50,  #50,
+                 force_factor=1.,
+                 fuel_factor=0.001,
                  alive=True,
-                 fps=60.
+                 fps=60.,
+                 training_mode=False
                  ):
 
         self.fps = fps
@@ -38,6 +38,7 @@ class Cart():
         self.selected = selected
         self.size = size if isinstance(size, tuple) else list(size) if isinstance(size, list) else (size, size)
         self.width = width
+        self.training_mode = training_mode
         self._fuel = 1.
 
         self.th_target = math.pi
@@ -60,9 +61,9 @@ class Cart():
         self.last_input = 0.
         self.LINEAR_FACTOR = linear_factor
         self.FORCE_FACTOR = force_factor
-        self.FUEL_FACTOR = fuel_factor * 60/fps
+        self.FUEL_FACTOR = fuel_factor * 60 / fps
         # self.model = Pendulo(1., 0.3, 5, x_damping=1, theta_damping=1, x0 = self.pos[0]/self.LINEAR_FACTOR, th0=th0, dt=1/60)
-        self.model = Pendulo(1., .3, 5, 1., 1., x0 = self.pos[0]/self.LINEAR_FACTOR, th0=th0, dt=1/self.fps)
+        self.model = Pendulo(1., .3, 5, 1., 1., x0=self.pos[0] / self.LINEAR_FACTOR, th0=th0, dt=1 / self.fps)
         self.jet = pygame.image.load("assets/jet.png")
         # self.particles_colors = ((90, 90, 60), (90, 60, 90))
         self.trace_particles_colors = ((90, 90, 60), (60, 60, 90))
@@ -70,18 +71,19 @@ class Cart():
 
         self.N_trace = 120
         self.update_trace_frequency = 1
-        self.trace = deque(maxlen=int(self.N_trace*fps/60))
+        self.trace = deque(maxlen=int(self.N_trace * fps / 60))
 
         self.reward_pole_on_target_short = 1
         self.reward_pole_on_target_long = 2
         self.reward_cart_on_target_short = 2
         self.reward_cart_on_target_long = 6
-        self.reward_death = -1
+        self.reward_on_death = -100
+        self.reward_death_per_tick = -1
 
-        self.time_pole_on_target_short = int(60 / (60 / self.fps))
-        self.time_pole_on_target_long = int(60 * 3 / (60 / self.fps))
-        self.time_cart_on_target_short = int(60 / (60 / self.fps))
-        self.time_cart_on_target_long = int(60 * 3 / (60 / self.fps))
+        self.time_pole_on_target_short = int(60 / (60 / self.fps)) if not self.training_mode else 0
+        self.time_pole_on_target_long = int(60 * 3 / (60 / self.fps)) if not self.training_mode else 0
+        self.time_cart_on_target_short = int(60 / (60 / self.fps)) if not self.training_mode else 0
+        self.time_cart_on_target_long = int(60 * 3 / (60 / self.fps)) if not self.training_mode else 0
 
     def saturate_pos(self) -> bool:
         original = (self.pos[0], self.pos[1])
@@ -131,13 +133,14 @@ class Cart():
             self.last_input = self.input.value
             self.reward = 0
             if self.alive:
-                self.model.step(self.input.value*self.FORCE_FACTOR )
-                self.fuel -= abs(self.input.value*self.FUEL_FACTOR)
-                if not self.set_pos(x=self.model.y[0][0]*self.LINEAR_FACTOR):
+                self.model.step(self.input.value * self.FORCE_FACTOR)
+                self.fuel -= abs(self.input.value * self.FUEL_FACTOR)
+                if not self.set_pos(x=self.model.y[0][0] * self.LINEAR_FACTOR):
                     self.alive = False
 
                 self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol and self.alive
-                self.pole_on_target = abs(math.fmod(self.model.theta - self.th_target, 2*math.pi)) < self.th_tol and self.alive
+                self.pole_on_target = abs(
+                    math.fmod(self.model.theta - self.th_target, 2 * math.pi)) < self.th_tol and self.alive
 
                 if not self.paused:
                     self.steps_with_pole_on_target = self.steps_with_pole_on_target + 1 if self.pole_on_target else 0
@@ -150,17 +153,19 @@ class Cart():
                         self.reward += self.reward_cart_on_target_short if self.steps_with_both_on_target < self.time_cart_on_target_long else self.reward_cart_on_target_long
                     self.ticks += 1
             else:
-                self.reward = self.reward_death
+                if self.ticks_since_death == 0:
+                    self.reward = self.reward_on_death
+                else:
+                    self.reward = self.reward_death_per_tick
                 self.ticks_since_death += 1
 
-            self.reward = int(self.reward*60/self.fps)
+            self.reward = int(self.reward * 60 / self.fps)
 
-            if not self.game_ended:
+            if not self.game_ended or self.ticks_since_death <= 1:
                 self.score += self.reward
                 self.uncollected_score += self.reward
-                self.score = max(self.score, 0)
-        return self.alive
 
+        return self.alive
 
     def feedback(self):
         if self.alive:
@@ -168,8 +173,7 @@ class Cart():
                 l = self.model.linear_acceleration / 120
                 r = -self.model.linear_acceleration / 120
 
-                self.input.source.rumble(l*.05, r, 100)
-
+                self.input.source.rumble(l * .05, r, 100)
 
     @property
     def pole_tip_pos(self):
@@ -179,15 +183,14 @@ class Cart():
 
     def draw(self):
 
-
         base_width = self.size[0]
         base_height = self.size[1]
         pole_length = base_width
-        r_border = 0 #base_height // 2
+        r_border = 0  #base_height // 2
 
         if self.alive:
             color = self.color
-            pole_color = (int(self.color[0]*1.5), int(self.color[1]*1.5), int(self.color[2]*1.5))
+            pole_color = (int(self.color[0] * 1.5), int(self.color[1] * 1.5), int(self.color[2] * 1.5))
             highlight_color = self.highlight_particles_colors[0]
             center_mass_colors = self.center_mass_colors
         else:
@@ -196,26 +199,30 @@ class Cart():
             color = lerp_v3(self.color, c2, t)
             pole_color = color
             highlight_color = color
-            center_mass_colors = (lerp_v3(self.center_mass_colors[0], c2, t), lerp_v3(self.center_mass_colors[1], c2, t))
+            center_mass_colors = (
+            lerp_v3(self.center_mass_colors[0], c2, t), lerp_v3(self.center_mass_colors[1], c2, t))
 
         if self.cart_on_target and self.pole_on_target and self.alive:
-            pygame.draw.rect(self.surface, highlight_color, (self.pos[0] - base_width//2 - 2, self.pos[1] - base_height//2 - 2, base_width+4, base_height+4), self.width+2, border_radius=r_border)
+            pygame.draw.rect(self.surface, highlight_color, (
+            self.pos[0] - base_width // 2 - 2, self.pos[1] - base_height // 2 - 2, base_width + 4, base_height + 4),
+                             self.width + 2, border_radius=r_border)
             draw_path_particles(self.surface, self.highlight_particles_colors[0], self.highlight_particles_colors[1],
                                 points=get_lines_rect(
-                                    pos=(self.pos[0] - base_width//2 - 4, self.pos[1]),
-                                    end_pos=(self.pos[0] + base_width//2 + 4, self.pos[1]),
-                                    width=base_height+4),
+                                    pos=(self.pos[0] - base_width // 2 - 4, self.pos[1]),
+                                    end_pos=(self.pos[0] + base_width // 2 + 4, self.pos[1]),
+                                    width=base_height + 4),
                                 max_radius=5,
                                 min_radius=0,
                                 density=.1,
                                 )
 
-        pygame.draw.rect(self.surface, color, (self.pos[0] - base_width//2, self.pos[1] - base_height//2, base_width, base_height), border_radius=r_border)
+        pygame.draw.rect(self.surface, color,
+                         (self.pos[0] - base_width // 2, self.pos[1] - base_height // 2, base_width, base_height),
+                         border_radius=r_border)
 
-
-        intensity_pixels_gain = int(8 + 2*random.random()) * 20
-        r_intensity = max(self.last_input*intensity_pixels_gain, 0.)
-        l_intensity = max(-self.last_input*intensity_pixels_gain, 0.)
+        intensity_pixels_gain = int(8 + 2 * random.random()) * 20
+        r_intensity = max(self.last_input * intensity_pixels_gain, 0.)
+        l_intensity = max(-self.last_input * intensity_pixels_gain, 0.)
         jet_height = base_height * 2.75
 
         l_image = pygame.transform.smoothscale(pygame.transform.flip(self.jet, True, False), (l_intensity, jet_height))
@@ -225,31 +232,36 @@ class Cart():
         # pygame.draw.rect(self.surface, (255,0,0), (self.pos[0] - base_width//2-r_intensity, self.pos[1] - base_height//2, r_intensity, base_height), self.width)
 
         if self.alive:
-            self.surface.blit(l_image, (self.pos[0] + base_width//2, self.pos[1] - jet_height//2, l_intensity, jet_height))
-            self.surface.blit(r_image, (self.pos[0] - base_width//2-r_intensity, self.pos[1] - jet_height//2, r_intensity, jet_height))
+            self.surface.blit(l_image,
+                              (self.pos[0] + base_width // 2, self.pos[1] - jet_height // 2, l_intensity, jet_height))
+            self.surface.blit(r_image, (
+            self.pos[0] - base_width // 2 - r_intensity, self.pos[1] - jet_height // 2, r_intensity, jet_height))
 
             for i, pos in enumerate(self.trace):
-                draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos, max_r:=int(12 * i / self.N_trace), 0, int(20*max_r**2/144), fps=self.fps)
+                draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos,
+                               max_r := int(12 * i / self.N_trace), 0, int(20 * max_r ** 2 / 144), fps=self.fps)
 
             if self.pole_on_target:
-                draw_pole(self.surface, highlight_color, self.pos, -self.model.theta+math.pi/2, pole_length+3, 14, center_mass=self.center_mass, center_mass_colors=center_mass_colors)
-                th = -self.model.theta+math.pi/2
+                draw_pole(self.surface, highlight_color, self.pos, -self.model.theta + math.pi / 2, pole_length + 3, 14,
+                          center_mass=self.center_mass, center_mass_colors=center_mass_colors)
+                th = -self.model.theta + math.pi / 2
                 start = self.pos
-                end = (start[0]+pole_length*math.cos(th), start[1]+(pole_length+6)*math.sin(th))
+                end = (start[0] + pole_length * math.cos(th), start[1] + (pole_length + 6) * math.sin(th))
                 draw_path_particles(self.surface, (200, 200, 0), (30, 40, 30),
                                     get_lines_rect(start,
                                                    end,
                                                    18),
-                                    5,  0, .1, closed=False)
+                                    5, 0, .1, closed=False)
 
-
-        draw_pole(self.surface, pole_color, self.pos, -self.model.theta+math.pi/2, pole_length, 8, center_mass=self.center_mass, center_mass_colors=center_mass_colors)
+        draw_pole(self.surface, pole_color, self.pos, -self.model.theta + math.pi / 2, pole_length, 8,
+                  center_mass=self.center_mass, center_mass_colors=center_mass_colors)
 
         draw_center_mass(self.surface, self.pos, colors=center_mass_colors)
 
         if self.alive and self.ticks % self.update_trace_frequency == 0:
-            theta = -self.model.theta + math.pi/2
-            self.trace.append((self.pos[0] + self.center_mass*pole_length * math.cos(theta), self.pos[1] + self.center_mass*pole_length * math.sin(theta)) )
+            theta = -self.model.theta + math.pi / 2
+            self.trace.append((self.pos[0] + self.center_mass * pole_length * math.cos(theta),
+                               self.pos[1] + self.center_mass * pole_length * math.sin(theta)))
 
 
 def draw_pole(surface: pygame.surface,
@@ -259,18 +271,15 @@ def draw_pole(surface: pygame.surface,
               length: float,
               width: int = 1,
               center_mass: float | None = None,
-              center_mass_colors = ((255,)*3, (0,)*3),
+              center_mass_colors=((255,) * 3, (0,) * 3),
               ):
-
     end_pos = (pos[0] + length * math.cos(theta), pos[1] + length * math.sin(theta))
 
     # pygame.draw.line(surface, color, pos, end_pos, width=width)
     draw_line_rect(surface, color, pos, end_pos, width=width)
     if center_mass is not None:
-        mass_pos = (pos[0] + center_mass*length * math.cos(theta), pos[1] + center_mass*length * math.sin(theta))
+        mass_pos = (pos[0] + center_mass * length * math.cos(theta), pos[1] + center_mass * length * math.sin(theta))
         draw_center_mass(surface, mass_pos, colors=center_mass_colors)
-
-
 
 
 def get_lines_rect(pos, end_pos, width):

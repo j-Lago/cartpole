@@ -1,22 +1,9 @@
-from itertools import count
-import assets
 import torch
-from pytorch_game import ptGame, DQN, get_dims_from_weights
+from pytorch_game import DQN, get_dims_from_weights, create_game
 
 
 def load_and_play(weights_path):
-    game = ptGame(name='CartPole',
-                  window_size=(1600, 900),
-                  fps=60,
-                  sounds=assets.sounds,
-                  fonts=assets.fonts,
-                  images=assets.images,
-                  game_duration=5,
-                  max_power=18,
-                  DO_NOT_RENDER=True,
-                  STEP_BY_STEP=True
-                  )
-
+    game = create_game(render=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'device: {device}')
 
@@ -39,4 +26,4 @@ def load_and_play(weights_path):
 
 
 if __name__ == '__main__':
-    load_and_play('meta/pendulo_trained_12.pth')
+    load_and_play('meta/wb2_best_score.pth')

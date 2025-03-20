@@ -36,9 +36,14 @@ class Game():
                  fonts: dict, images: dict,
                  game_duration: float = 30.,
                  max_power: float = 18.,
+                 th0: float = 0.,
                  save_file: str = 'meta/save.json',
                  DO_NOT_RENDER: bool = False,
-                 STEP_BY_STEP: bool = False):
+                 STEP_BY_STEP: bool = False,
+                 verbose: bool = False,
+                 training_mode = False,):
+
+
 
         if fps not in [30, 60]:
             raise ValueError(f"Valor fps={fps} inválido. Apenas 30 e 60 são suportados.")
@@ -48,9 +53,13 @@ class Game():
         self.MAX_POWER = max_power
         self.save_file_name =  save_file
         self.DO_NOT_RENDER = DO_NOT_RENDER
+        self.VERBOSE = verbose
         self.STEP_BY_STEP = STEP_BY_STEP
         self.screen_shake_disable = True
         self.MAX_PARTICLES = 1000
+        self.training_mode = training_mode
+        self.th0 = th0
+
 
         pygame.init()
         pygame.mouse.set_visible(False)
@@ -113,6 +122,7 @@ class Game():
         self.inputs = dict()
         self.particles = None
         self.bars = None
+        self.marked_to_end = None
         # -- reset --------------------------------------
         self.reset()
 
@@ -143,6 +153,7 @@ class Game():
         self.time = 0.
         self.paused_time = 0.
         self.state = GAMESTATE.PRE_INIT
+        self.marked_to_end = False
         y_sup = 0.35
         y_inf = 0.78
         self.npcs = {
@@ -150,14 +161,16 @@ class Game():
                 'target_p2': Cart(self.screen, None, (self.screen_center[0]     , int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi, alive=False),
             }
         dth = random.random()*.1
+        th0 = self.th0 if not self.training_mode else random.uniform(0., 2*math.pi)
+        x0 = 1/3 if not self.training_mode else random.uniform(0.2, 0.8)
         if not self.DO_NOT_RENDER and not self.STEP_BY_STEP:
             self.players = {
-                'p1'       : Cart(self.screen, self.axes['p1'], (self.screen_width * 1 // 3, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=math.pi*0+dth, force_factor=self.MAX_POWER, fps=self.fps),
-                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi*0+dth, force_factor=self.MAX_POWER, fps=self.fps),
+                'p1'       : Cart(self.screen, self.axes['p1'], (self.screen_width * x0, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=th0+dth, force_factor=self.MAX_POWER, fps=self.fps, training_mode=self.training_mode),
+                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * x0, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=th0+dth, force_factor=self.MAX_POWER, fps=self.fps, training_mode=self.training_mode),
             }
         else:
             self.players = {
-                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * 1 // 3, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=math.pi*0+dth, force_factor=self.MAX_POWER, fps=self.fps),
+                'p2'       : Cart(self.screen, self.axes['p2'], (self.screen_width * x0, int(self.screen_height*y_inf)), color=cols['p2'], width=3, size=assets.sizes['cart'], th0=th0+dth, force_factor=self.MAX_POWER, fps=self.fps, training_mode=self.training_mode),
             }
 
         fuel_bar_width = 500
@@ -184,6 +197,9 @@ class Game():
 
         pygame.event.clear()
         self.clear_popups()
+        self.enable_rendering(not self.DO_NOT_RENDER)
+        if self.DO_NOT_RENDER and self.state == GAMESTATE.PRE_INIT:
+            self.state = GAMESTATE.RUN
 
     def inc_time(self):
         if self.state == GAMESTATE.RUN:
@@ -194,14 +210,18 @@ class Game():
 
             self.bars['timer'].value = max((self.duration - self.time) / self.duration, 0.)
 
+        if self.marked_to_end:
+            self.game_over()
+
+        if self.all_dead() and self.state not in [GAMESTATE.PRE_INIT, GAMESTATE.TIMEOUT, GAMESTATE.GAME_OVER]:
+            self.marked_to_end = True
+
     def loop(self):
         while True:
 
             if self.state == GAMESTATE.RUN:
                 self.inc_time()
 
-                if self.all_dead() and self.state not in [GAMESTATE.TIMEOUT, GAMESTATE.GAME_OVER]:
-                    self.game_over()
             else:
                 self.paused_time += 1/self.fps
                 if self.state == GAMESTATE.PRE_INIT:
@@ -270,6 +290,16 @@ class Game():
                 pygame.display.flip()
                 self.clock.tick(self.fps)
 
+    def enable_rendering(self, state):
+        self.DO_NOT_RENDER = not state
+        if self.DO_NOT_RENDER:
+            self.screen.fill(cols['bg'])
+            text = self.fonts['normal'].render(f"RENDERING DISABLED", True, cols['hud'])
+            self.screen.blit(text, (
+            self.screen_center[0] - text_center(text)[0], self.screen_center[1] - text_center(text)[1]))
+
+            pygame.display.flip()
+
     @property
     def screen_center(self) -> tuple[int, int]:
         return self.screen.get_width() // 2, self.screen.get_height() // 2
@@ -294,8 +324,8 @@ class Game():
     def game_over(self):
         self.state = GAMESTATE.GAME_OVER
         for player in self.players.values():
-            player.alive = False
             player.game_ended = True
+            # player.alive = False
         self.save_score()
 
     def timeout(self):
@@ -355,16 +385,18 @@ class Game():
             player.paused = True if self.state == GAMESTATE.PAUSED else False
 
     def save_score(self):
-        print(f'{self.state} (', end='')
         for key, player in self.players.items():
-            if not key.startswith('target_'):
-                print(f'{key}: {player.score}', end=', ')
-                if player.score > self.best_score:
-                    self.best_score = player.score
-                    self.best_score_device = player.input.device_type
-        print('\b\b)')
-        if self.DO_NOT_RENDER:
-            self.reset()
+            if player.score > self.best_score:
+                self.best_score = player.score
+                self.best_score_device = player.input.device_type
+
+        if self.VERBOSE:
+            print(f'{self.state} (', end='')
+            for key, player in self.players.items():
+                if not key.startswith('target_'):
+                    print(f'{key}: {player.score}', end=', ')
+            print('\b\b)')
+
 
     def process_inputs(self):
         for axis in self.axes.values():
@@ -384,16 +416,21 @@ class Game():
             self.inc_time()
             self.simulate()
 
+
         if not self.DO_NOT_RENDER:
             self.draw()
             pygame.display.flip()
-            self.clock.tick(self.fps)
+            # self.clock.tick(self.fps)
 
-        all_alive = True
+        all_dead = True
         for key, value in input_key_value.items():
-            all_alive = all_alive and self.players[key].alive
+            all_dead = all_dead and not self.players[key].alive
 
-        return not all_alive
+        all_empy = True
+        for key, value in input_key_value.items():
+            all_empy = all_empy and self.players[key].fuel == 0
+
+        return all_dead or all_empy
 
     def simulate(self):
         f = 60 / self.fps
@@ -446,14 +483,13 @@ class Game():
                         )
                     play_sound_for_collected_score = True
 
-        if not self.DO_NOT_RENDER:
+        if not self.DO_NOT_RENDER and not self.training_mode:
             if play_sound_for_collected_score:
                 self.sounds['coin'].play()
 
-        if self.state != GAMESTATE.PAUSED:
-            self.particles.step()
-        # self.particles.garbage_collect()
-
+            if self.state != GAMESTATE.PAUSED:
+                self.particles.step()
+            # self.particles.garbage_collect()
 
     def all_dead(self) -> bool:
         all_dead = True
