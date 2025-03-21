@@ -44,6 +44,10 @@ class ptGame(Game):
         self.steps_count += 1
         axis_input = (0., 1., -1., 0.5, -0.5)[action]
         done = self.ia_step({self.player_key: axis_input})
+
+        if self.players[self.player_key].fuel == 0:
+            done = True
+
         reward = self.get_reward(axis_input, done)
         score = self.players[self.player_key].score
         if done and verbose == 2:
