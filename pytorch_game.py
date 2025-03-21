@@ -4,7 +4,7 @@ import numpy as np
 import assets
 from collections import namedtuple, deque
 import random
-
+import math
 
 class ptGame(Game):
     def __init__(self, *args, **kwargs):
@@ -29,13 +29,22 @@ class ptGame(Game):
         self.state = GAMESTATE.RUN
         return self.get_state()
 
+    def get_reward(self, axis_input, done):
+        dx = self.players[self.player_key].model.y[0][0] / 16
+        dth = abs(math.pi - abs(self.players[self.player_key].model.y[2][0])) / math.pi
+
+        reward = -0.15*dx**2 - 0.8*dth**2 - 0.05*abs(axis_input)
+
+        if done:
+            reward -= 10.0
+
+        return reward
+
     def simulate_system(self, action, verbose=0):
         self.steps_count += 1
         axis_input = (0., 1., -1., 0.5, -0.5)[action]
         done = self.ia_step({self.player_key: axis_input})
-        reward = self.players[self.player_key].reward - abs(axis_input)*0.1
-        if done:
-            reward -= 100
+        reward = self.get_reward(axis_input, done)
         score = self.players[self.player_key].score
         if done and verbose == 2:
             print(f'{self.state}, {score=}')
@@ -45,22 +54,7 @@ class ptGame(Game):
         return next_state, reward, done
 
 
-class DQN(torch.nn.Module):
-    def __init__(self, dims, device):
-        super().__init__()
-        self.device = device
-        self.dims = dims
 
-        self.l1 = torch.nn.Linear(in_features=dims[0], out_features=dims[1]).to(device)
-        self.l2 = torch.nn.Linear(in_features=dims[1], out_features=dims[2]).to(device)
-        self.l3 = torch.nn.Linear(in_features=dims[2], out_features=dims[3]).to(device)
-
-    def forward(self, obs):
-        obs=obs.to(self.device)
-        i1 = torch.nn.functional.relu(self.l1(obs))
-        i2 = torch.nn.functional.relu(self.l2(i1))
-        q = self.l3(i2)
-        return q
 
 
 class ReplayMemory():
@@ -138,16 +132,6 @@ class Qvalues():
         values = torch.zeros(batch_size).to(device)
         values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detach()
         return values
-
-
-def get_dims_from_weights(weights) -> tuple:
-    dims_in, dims_out  = [], []
-    for key, value in weights.items():
-        if key.endswith('weight'):
-            dims_in.append(value.size(1))
-            dims_out.append(value.size(0))
-    dims_in.append(dims_out[-1])
-    return tuple(dims_in)
 
 
 def create_game(render=False) -> ptGame:

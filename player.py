@@ -4,14 +4,14 @@ import math
 from pendulo import Pendulo
 import random
 from _collections import deque
-from inputs import Axis, KeysControl
+from inputs import Joystick, KeysControl
 from tools import draw_center_mass, draw_particles, draw_path_particles, lerp, lerp_v2, lerp_v3, get_direction
 
 
 class Cart():
     def __init__(self,
                  surface,
-                 controller: Axis | KeysControl,
+                 controller: Joystick | KeysControl,
                  pos=(0., 0.),
                  color=(255, 255, 255),
                  center_mass_colors=((255,) * 3, (0,) * 3),
@@ -27,12 +27,14 @@ class Cart():
                  training_mode=False
                  ):
 
+
         self.fps = fps
         self.paused = False
-        self.game_ended = False
         self.input = controller
         self.surface = surface
         self.pos = pos if isinstance(pos, list) else list(pos)
+
+
         self.color = color
         self.center_mass_colors = center_mass_colors
         self.selected = selected
@@ -59,11 +61,12 @@ class Cart():
 
         self.center_mass = 0.5
         self.last_input = 0.
+        self.XBIAS = -self.surface.get_width()//2
         self.LINEAR_FACTOR = linear_factor
         self.FORCE_FACTOR = force_factor
         self.FUEL_FACTOR = fuel_factor * 60 / fps
         # self.model = Pendulo(1., 0.3, 5, x_damping=1, theta_damping=1, x0 = self.pos[0]/self.LINEAR_FACTOR, th0=th0, dt=1/60)
-        self.model = Pendulo(1., .3, 5, 1., 1., x0=self.pos[0] / self.LINEAR_FACTOR, th0=th0, dt=1 / self.fps)
+        self.model = Pendulo(1., .3, 5, 1., 1., x0=(self.pos[0]+self.XBIAS) / self.LINEAR_FACTOR, th0=th0, dt=1 / self.fps)
         self.jet = pygame.image.load("assets/jet.png")
         # self.particles_colors = ((90, 90, 60), (90, 60, 90))
         self.trace_particles_colors = ((90, 90, 60), (60, 60, 90))
@@ -106,10 +109,10 @@ class Cart():
             self.pos[1] = y
         return self.saturate_pos()
 
-    def delta_pos(self, dx=0., dy=0.):
-        self.pos[0] += dx
-        self.pos[1] += dy
-        self.saturate_pos()
+    # def delta_pos(self, dx=0., dy=0.):
+    #     self.pos[0] += dx
+    #     self.pos[1] += dy
+    #     self.saturate_pos()
 
     # def draw(self):
     #     pygame.draw.line(self.surface, self.color, (self.pos[0] - self.size[0] // 2, self.pos[1]), (self.pos[0] + self.size[1] // 2, self.pos[1]), self.width)
@@ -135,7 +138,7 @@ class Cart():
             if self.alive:
                 self.model.step(self.input.value * self.FORCE_FACTOR)
                 self.fuel -= abs(self.input.value * self.FUEL_FACTOR)
-                if not self.set_pos(x=self.model.y[0][0] * self.LINEAR_FACTOR):
+                if not self.set_pos(x=self.model.y[0][0] * self.LINEAR_FACTOR - self.XBIAS):
                     self.alive = False
 
                 self.cart_on_target = abs(self.pos[0] - self.x_target) < self.x_tol and self.alive
@@ -153,23 +156,22 @@ class Cart():
                         self.reward += self.reward_cart_on_target_short if self.steps_with_both_on_target < self.time_cart_on_target_long else self.reward_cart_on_target_long
                     self.ticks += 1
             else:
-                if self.ticks_since_death == 0:
-                    self.reward = self.reward_on_death
-                else:
-                    self.reward = self.reward_death_per_tick
+                self.reward = 0
                 self.ticks_since_death += 1
 
             self.reward = int(self.reward * 60 / self.fps)
+            self.score += self.reward
+            self.uncollected_score += self.reward
 
-            if not self.game_ended or self.ticks_since_death <= 1:
-                self.score += self.reward
-                self.uncollected_score += self.reward
+            # if self.game_state not in [GAMESTATE.TIMEOUT, GAMESTATE.GAME_OVER]:
+            #     self.score += self.reward
+            #     self.uncollected_score += self.reward
 
         return self.alive
 
     def feedback(self):
         if self.alive:
-            if isinstance(self.input, Axis):
+            if isinstance(self.input, Joystick):
                 l = self.model.linear_acceleration / 120
                 r = -self.model.linear_acceleration / 120
 
@@ -200,11 +202,11 @@ class Cart():
             pole_color = color
             highlight_color = color
             center_mass_colors = (
-            lerp_v3(self.center_mass_colors[0], c2, t), lerp_v3(self.center_mass_colors[1], c2, t))
+                lerp_v3(self.center_mass_colors[0], c2, t), lerp_v3(self.center_mass_colors[1], c2, t))
 
         if self.cart_on_target and self.pole_on_target and self.alive:
             pygame.draw.rect(self.surface, highlight_color, (
-            self.pos[0] - base_width // 2 - 2, self.pos[1] - base_height // 2 - 2, base_width + 4, base_height + 4),
+                self.pos[0] - base_width // 2 - 2, self.pos[1] - base_height // 2 - 2, base_width + 4, base_height + 4),
                              self.width + 2, border_radius=r_border)
             draw_path_particles(self.surface, self.highlight_particles_colors[0], self.highlight_particles_colors[1],
                                 points=get_lines_rect(
@@ -235,7 +237,7 @@ class Cart():
             self.surface.blit(l_image,
                               (self.pos[0] + base_width // 2, self.pos[1] - jet_height // 2, l_intensity, jet_height))
             self.surface.blit(r_image, (
-            self.pos[0] - base_width // 2 - r_intensity, self.pos[1] - jet_height // 2, r_intensity, jet_height))
+                self.pos[0] - base_width // 2 - r_intensity, self.pos[1] - jet_height // 2, r_intensity, jet_height))
 
             for i, pos in enumerate(self.trace):
                 draw_particles(self.surface, self.trace_particles_colors[0], self.trace_particles_colors[1], pos,

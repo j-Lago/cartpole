@@ -78,6 +78,7 @@ class Pendulo:
                                  -self.m*self.L*cos_th*u))
 
         self.integrate(self.dy, self.y)
+        self.y[2][0] = np.fmod(self.y[2][0], 2*np.pi)
         # px = np.sin(self.y[2][0]) * self.L + self.y[0][0]
         # py = -np.cos(self.y[2][0]) * self.L
 

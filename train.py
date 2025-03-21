@@ -1,16 +1,17 @@
 import torch
 import keyboard
 from pytorch_game import create_game as Environment
-from pytorch_game import DQN, Agent, ReplayMemory, Experience, Qvalues, extract_tensors
+from pytorch_game import Agent, ReplayMemory, Experience, Qvalues, extract_tensors
+from dqn import DQN
 import wandb
 from tictoc import tictoc as tt
 
 
 def train():
     project = 'CartPole'
-    name = '2025, large_batch_size'
-    file_load = 'meta/wb2_best_score.pth'
-    file_training = 'meta/wb3.pth'
+    name = 'normalized_reward'
+    file_load = 'meta/play_80k.pth'
+    file_training = 'meta/last_train.pth'
 
     DEVICE = 'cpu'        # 'cuda'
     LOAD_WEIGHTS = True

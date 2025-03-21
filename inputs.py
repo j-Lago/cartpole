@@ -2,7 +2,9 @@ import random
 from typing import Callable
 from functools import partial
 import pygame
-
+import torch
+import numpy as np
+from dqn import DQN, get_dims_from_weights
 
 
 JOYBUTTON: dict[str, int] = {
@@ -24,7 +26,7 @@ JOYBUTTON: dict[str, int] = {
     'pad': 15,
 }
 
-class Axis():
+class Joystick():
     def __init__(self, source: pygame.joystick, channel, dead_zone: float = 0., initial_value = 0., normalization: Callable = lambda x: x):
         self.source = source
         self.channel = channel
@@ -33,7 +35,7 @@ class Axis():
         self.normalization = normalization
         self.device_type = 'joystick'
 
-    def update(self):
+    def update(self, player):
         self.value = self.normalization(remove_dead_zone(self.source.get_axis(self.channel), self.dead_zone))
 
 
@@ -48,7 +50,7 @@ class KeysControl():
         self.normalization = normalization
         self.device_type = 'keyboard'
 
-    def update(self):
+    def update(self, player):
         keys = self.source.get_pressed()
         out = 0
         if keys[self.key_left]:
@@ -64,15 +66,33 @@ class KeysControl():
 
 
 class IAControl:
-    def __init__(self, initial_value = 0., normalization: Callable = lambda x: x):
+    def __init__(self, initial_value=0., weights_path='meta/play.pth', normalization: Callable = lambda x: x):
         self.value = initial_value
         self.normalization = normalization
         self.device_type = 'IA'
 
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        weights = torch.load(weights_path, weights_only=True)
+        dims = get_dims_from_weights(weights)
 
-    def update(self):
-        self.value += self.normalization((random.random()*2-1)*0.6)
-        self.value = max(-1., min(self.value, 1.))
+        self.police_net = DQN(dims, self.device)
+        self.police_net.load_state_dict(weights)
+
+        self.value = initial_value
+
+    def update(self, player):
+        state = np.array([player.model.y[0][0], player.model.y[0][1],
+                          player.model.y[1][0], player.model.y[1][1],
+                          player.model.y[2][0], player.model.y[2][1],
+                          player.model.y[3][0], player.model.y[3][1], player.fuel])
+        pt_state = torch.Tensor(torch.tensor(np.array([state]), dtype=torch.float))
+        with torch.no_grad():
+            action = self.police_net(pt_state).argmax(dim=1).to(self.device)
+        self.value = self.normalization((0., 1., -1., 0.5, -0.5)[action])
+
+    # def update(self):
+    #     self.value += self.normalization((random.random()*2-1)*0.6)
+    #     self.value = max(-1., min(self.value, 1.))
 
 
 

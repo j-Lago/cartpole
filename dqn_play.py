@@ -1,5 +1,6 @@
 import torch
-from pytorch_game import DQN, get_dims_from_weights, create_game
+from pytorch_game import create_game
+from dqn import DQN, get_dims_from_weights
 
 
 def load_and_play(weights_path):
@@ -26,4 +27,4 @@ def load_and_play(weights_path):
 
 
 if __name__ == '__main__':
-    load_and_play('meta/wb2_best_score.pth')
+    load_and_play('meta/play.pth')

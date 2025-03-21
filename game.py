@@ -4,10 +4,9 @@ from functools import partial
 import pygame
 import sys
 from player import Cart
-from inputs import Axis, KeysControl, IAControl, JOYBUTTON
+from inputs import Joystick, KeysControl, IAControl, JOYBUTTON
 import math
 import random
-from enum import Enum
 import assets
 from assets import colors as cols
 from tools import lerp_v3, centered_rect
@@ -16,17 +15,11 @@ from copy import copy, deepcopy
 from particle import TextParticle, BallParticle, Particles
 from overlay import Overlay
 from progressbar import ProgressBar
+from game_state import GAMESTATE
 
 import os
 os.environ['SDL_JOYSTICK_HIDAPI_PS4_RUMBLE'] = '1'
 
-
-class GAMESTATE(Enum):
-    PRE_INIT = -1
-    RUN = 1
-    PAUSED = 0
-    TIMEOUT = -2
-    GAME_OVER = -3
 
 
 class Game():
@@ -85,17 +78,17 @@ class Game():
         self.axes = dict()
         key = 'p1'
         if key in self.joysticks.keys():
-            self.axes[key] = Axis(source=self.joysticks[key], channel=2, dead_zone=0.05)
+            self.axes[key] = Joystick(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
             self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
 
         key = 'p2'
         if key in self.joysticks.keys():
-            self.axes[key] = Axis(source=self.joysticks[key], channel=2, dead_zone=0.05)
+            self.axes[key] = Joystick(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
             # self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
-            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
-            # self.axes[key] = IAControl()
+            # self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_a, key_right=pygame.K_d, key_intensity=pygame.K_SPACE)
+            self.axes[key] = IAControl()
 
         # assets
         self.sounds = load_sounds(sounds)
@@ -162,7 +155,7 @@ class Game():
             }
         dth = random.random()*.1
         th0 = self.th0 if not self.training_mode else random.uniform(0., 2*math.pi)
-        x0 = 1/3 if not self.training_mode else random.uniform(0.2, 0.8)
+        x0 = 0.3 if not self.training_mode else random.uniform(0.2, 0.8)
         if not self.DO_NOT_RENDER and not self.STEP_BY_STEP:
             self.players = {
                 'p1'       : Cart(self.screen, self.axes['p1'], (self.screen_width * x0, int(self.screen_height*y_sup)), color=cols['p1'], width=3, size=assets.sizes['cart'], th0=th0+dth, force_factor=self.MAX_POWER, fps=self.fps, training_mode=self.training_mode),
@@ -210,11 +203,12 @@ class Game():
 
             self.bars['timer'].value = max((self.duration - self.time) / self.duration, 0.)
 
-        if self.marked_to_end:
-            self.game_over()
+        # if self.marked_to_end:
+        #     self.game_over()
 
         if self.all_dead() and self.state not in [GAMESTATE.PRE_INIT, GAMESTATE.TIMEOUT, GAMESTATE.GAME_OVER]:
-            self.marked_to_end = True
+            self.game_over()
+            # self.marked_to_end = True
 
     def loop(self):
         while True:
@@ -290,6 +284,11 @@ class Game():
                 pygame.display.flip()
                 self.clock.tick(self.fps)
 
+            # m = self.players['p1'].model
+            # dx = m.y[0][0] / 16
+            # dth = abs(math.pi - abs(m.y[2][0])) / math.pi
+            # print(dth, dx)
+
     def enable_rendering(self, state):
         self.DO_NOT_RENDER = not state
         if self.DO_NOT_RENDER:
@@ -318,27 +317,27 @@ class Game():
 
     def save_to_file(self):
         save = {'best_score': self.best_score, 'best_score_device': self.best_score_device}
-        with open(self.save_file_name, 'w') as arquivo_json:
-            json.dump(save, arquivo_json)
+        with open(self.save_file_name, 'w') as json_file:
+            json.dump(save, json_file)
 
     def game_over(self):
         self.state = GAMESTATE.GAME_OVER
         for player in self.players.values():
-            player.game_ended = True
-            # player.alive = False
+            player.alive = False
         self.save_score()
 
     def timeout(self):
         self.state = GAMESTATE.TIMEOUT
         for player in self.players.values():
             player.alive = False
-            player.game_ended = True
         if not self.DO_NOT_RENDER:
             self.sounds['whistle'].play()
         self.save_score()
 
     def start(self):
         self.state = GAMESTATE.RUN
+        for player in self.players.values():
+            player.alive = True
         if not self.DO_NOT_RENDER:
             self.sounds['beep'].play()
             self.sounds['jet_r'].play(loops=-1)
@@ -399,8 +398,8 @@ class Game():
 
 
     def process_inputs(self):
-        for axis in self.axes.values():
-            axis.update()
+        for key, axis in self.axes.items():
+            axis.update(self.players[key])
         for key, player in self.players.items():
             self.inputs[key] = self.axes[key].value * self.MAX_POWER
 
