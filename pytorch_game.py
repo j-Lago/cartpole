@@ -33,7 +33,7 @@ class ptGame(Game):
         dx = self.players[self.player_key].model.y[0][0] / 16
         dth = abs(math.pi - abs(self.players[self.player_key].model.y[2][0])) / math.pi
 
-        reward = -0.15*dx**2 - 0.8*dth**2 - 0.05*abs(axis_input)
+        reward = -0.4*dx**2 - 0.58*dth**2 - 0.02*abs(axis_input)
 
         if done:
             reward -= 10.0

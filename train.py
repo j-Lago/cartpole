@@ -9,8 +9,8 @@ from tictoc import tictoc as tt
 
 def train():
     project = 'CartPole'
-    name = 'normalized_reward'
-    file_load = 'meta/play_80k.pth'
+    name = 'target'
+    file_load = 'meta/play_balance.pth'
     file_training = 'meta/last_train.pth'
 
     DEVICE = 'cpu'        # 'cuda'
@@ -45,7 +45,7 @@ def train():
     print(f'{device=}')
 
     if LOAD_WEIGHTS:
-        eps_start = 0.9
+        eps_start = 0.5
 
     agent = Agent(eps_start, eps_end, eps_decay, n_actions, device)
     memory = ReplayMemory(memory_size)
