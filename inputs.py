@@ -77,7 +77,7 @@ class LinearControl:
     def update(self, player):
         time = player.ticks / player.fps
         # coreografia inicial
-        init_r, pause_1, swing_l, pause_2 = 1.4, 1.1, 0.68, 0.95
+        init_r, pause_1, swing_l, pause_2 = 1.25, 1.2, 0.68, 1.5
         if time < init_r:
             f = 1.
         elif time < init_r + pause_1:
@@ -101,11 +101,11 @@ class LinearControl:
         th = th + self.th_target if th < 0 else th - self.th_target
 
         a = player.model.y[3][0]
-        f = -th*1.4 - a*1.7 + 0.1*v
+        f = -th*1.5 - a*1.7 + 0.1*v
 
-        if time > 10:
+        if time > 25:
             self.intx += dt * x
-            self.th_target += (-0.00003*x +0.00000*self.intx +0.0001*v)
+            self.th_target += (-0.0003*x -0.0000*self.intx +0.0002*v)
 
         return min(max(f, -1.), 1.)
 

@@ -266,6 +266,8 @@ class Game():
                     if keys[pygame.K_ESCAPE]: self.reset()
                     if keys[pygame.K_k]: self.screen_shake_disable = not self.screen_shake_disable
                     if keys[pygame.K_p]: self.popup()
+                    if keys[pygame.K_COMMA]: self.perturb(0.2)
+                    if keys[pygame.K_PERIOD]: self.perturb(-0.2)
 
 
             if self.state == GAMESTATE.RUN:
@@ -289,6 +291,10 @@ class Game():
             # dx = m.y[0][0] / 16
             # dth = abs(math.pi - abs(m.y[2][0])) / math.pi
             # print(dth, dx)
+
+    def perturb(self, intensity):
+        for player in self.players.values():
+            player.model.y[3][0] += intensity
 
     def enable_rendering(self, state):
         self.DO_NOT_RENDER = not state
