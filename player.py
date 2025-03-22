@@ -109,6 +109,9 @@ class Cart():
             self.pos[1] = y
         return self.saturate_pos()
 
+    def perturb(self, intensity):
+        self.model.y[3][0] += intensity
+
     # def delta_pos(self, dx=0., dy=0.):
     #     self.pos[0] += dx
     #     self.pos[1] += dy
@@ -269,6 +272,7 @@ class Cart():
             theta = -self.model.theta + math.pi / 2
             self.trace.append((self.pos[0] + self.center_mass * pole_length * math.cos(theta),
                                self.pos[1] + self.center_mass * pole_length * math.sin(theta)))
+
 
 
 def draw_pole(surface: pygame.surface,

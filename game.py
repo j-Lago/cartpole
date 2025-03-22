@@ -294,7 +294,7 @@ class Game():
 
     def perturb(self, intensity):
         for player in self.players.values():
-            player.model.y[3][0] += intensity
+            player.perturb(intensity)
 
     def enable_rendering(self, state):
         self.DO_NOT_RENDER = not state
