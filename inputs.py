@@ -31,10 +31,14 @@ class Joystick():
     def __init__(self, source: pygame.joystick, channel, dead_zone: float = 0., initial_value = 0., normalization: Callable = lambda x: x):
         self.source = source
         self.channel = channel
+        self.initial_value = initial_value
         self.value = initial_value
         self.dead_zone = dead_zone
         self.normalization = normalization
         self.device_type = 'joystick'
+
+    def reset(self):
+        self.value = self.initial_value
 
     def update(self, player):
         self.value = self.normalization(remove_dead_zone(self.source.get_axis(self.channel), self.dead_zone))
@@ -47,9 +51,13 @@ class KeysControl():
         self.key_left = key_left
         self.key_right = key_right
         self.key_intensity = key_intensity
+        self.initial_value = initial_value
         self.value = initial_value
         self.normalization = normalization
         self.device_type = 'keyboard'
+
+    def reset(self):
+        self.value = self.initial_value
 
     def update(self, player):
         keys = self.source.get_pressed()
@@ -69,10 +77,16 @@ class KeysControl():
 class LinearControl:
     def __init__(self, initial_value=0., normalization: Callable = lambda x: x):
         self.value = initial_value
+        self.initial_value = initial_value
         self.normalization = normalization
         self.intx = 0.
         self.th_target = math.pi
         self.device_type = 'Classic Linear Controller'
+
+    def reset(self):
+        self.value = self.initial_value
+        self.intx = 0.
+        self.th_target = math.pi
 
     def update(self, player):
         time = player.ticks / player.fps
@@ -103,7 +117,7 @@ class LinearControl:
         a = player.model.y[3][0]
         f = -th*1.5 - a*1.7 + 0.1*v
 
-        if time > 25:
+        if time > 10:
             self.intx += dt * x
             self.th_target += (-0.0003*x -0.0000*self.intx +0.0002*v)
 
@@ -111,6 +125,7 @@ class LinearControl:
 
 class IAControl:
     def __init__(self, initial_value=0., weights_path='meta/play.pth', normalization: Callable = lambda x: x):
+        self.initial_value = initial_value
         self.value = initial_value
         self.normalization = normalization
         self.device_type = 'IA'
@@ -122,7 +137,9 @@ class IAControl:
         self.police_net = DQN(dims, self.device)
         self.police_net.load_state_dict(weights)
 
-        self.value = initial_value
+    def reset(self):
+        self.value = self.initial_value
+
 
     def update(self, player):
         state = np.array([player.model.y[0][0], player.model.y[0][1],
