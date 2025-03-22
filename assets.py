@@ -21,7 +21,8 @@ fonts = {
 }
 
 images = {
-    'jet': 'assets/jet.png'
+    'jet': 'assets/jet.png',
+    'dedo': 'assets/dedo.png',
 }
 
 colors = {

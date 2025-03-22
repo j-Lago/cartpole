@@ -38,6 +38,7 @@ class Game():
 
 
 
+
         if fps not in [30, 60]:
             raise ValueError(f"Valor fps={fps} inválido. Apenas 30 e 60 são suportados.")
 
@@ -117,6 +118,8 @@ class Game():
         self.particles = None
         self.bars = None
         self.marked_to_end = None
+        self.perturbation = 0
+        self.perturbation_ticks = 0
         # -- reset --------------------------------------
         self.reset()
 
@@ -139,6 +142,8 @@ class Game():
             self.loop()
 
     def reset(self):
+        self.perturbation = 0
+        self.perturbation_ticks = 0
         self.mixer.quit()
         self.mixer = pygame.mixer
         self.mixer.init()
@@ -266,8 +271,8 @@ class Game():
                     if keys[pygame.K_ESCAPE]: self.reset()
                     if keys[pygame.K_k]: self.screen_shake_disable = not self.screen_shake_disable
                     if keys[pygame.K_p]: self.popup()
-                    if keys[pygame.K_COMMA]: self.perturb(0.2)
-                    if keys[pygame.K_PERIOD]: self.perturb(-0.2)
+                    if keys[pygame.K_COMMA]: self.perturb(0.4)
+                    if keys[pygame.K_PERIOD]: self.perturb(-0.4)
 
 
             if self.state == GAMESTATE.RUN:
@@ -295,6 +300,7 @@ class Game():
     def perturb(self, intensity):
         for player in self.players.values():
             player.perturb(intensity)
+            self.perturbation = intensity
 
     def enable_rendering(self, state):
         self.DO_NOT_RENDER = not state
@@ -524,6 +530,22 @@ class Game():
 
             for player in self.players.values():
                 player.draw()
+
+            if self.perturbation != 0:
+                for player in self.players.values():
+                    if player.alive:
+                        w, h = 80, 50
+                        x, y = player.pole_tip_pos
+                        if self.perturbation < 0:
+                            x -= w
+                        y -= h//2 - 10
+                        dedo = pygame.transform.smoothscale(
+                            pygame.transform.flip(self.images['dedo'], self.perturbation > 0, False),(w, h))
+                        self.screen.blit(dedo, (x, y, w, h))
+                self.perturbation_ticks += 1
+                if self.perturbation_ticks * 1/self.fps > 0.2:
+                    self.perturbation = 0
+                    self.perturbation_ticks = 0
 
 
             self.particles.draw()
