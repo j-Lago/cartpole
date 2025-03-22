@@ -81,8 +81,8 @@ class Game():
         if key in self.joysticks.keys():
             self.axes[key] = Joystick(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
-            # self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
-            self.axes[key] = LinearControl()
+            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
+            # self.axes[key] = LinearControl()
 
         key = 'p2'
         if key in self.joysticks.keys():
@@ -534,13 +534,14 @@ class Game():
             if self.perturbation != 0:
                 for player in self.players.values():
                     if player.alive:
+                        direction = (abs(player.model.y[2][0]) < math.pi/2) ^ (self.perturbation > 0)
                         w, h = 80, 50
                         x, y = player.pole_tip_pos
-                        if self.perturbation < 0:
+                        if not direction:
                             x -= w
                         y -= h//2 - 10
                         dedo = pygame.transform.smoothscale(
-                            pygame.transform.flip(self.images['dedo'], self.perturbation > 0, False),(w, h))
+                            pygame.transform.flip(self.images['dedo'], direction, False),(w, h))
                         self.screen.blit(dedo, (x, y, w, h))
                 self.perturbation_ticks += 1
                 if self.perturbation_ticks * 1/self.fps > 0.2:

@@ -181,6 +181,10 @@ class Cart():
                 self.input.source.rumble(l * .05, r, 100)
 
     @property
+    def theta(self):
+        return self.model.theta
+
+    @property
     def pole_tip_pos(self):
         x = self.pos[0] + self.size[0] * math.sin(self.model.theta)
         y = self.pos[1] + self.size[0] * math.cos(self.model.theta)
