@@ -4,7 +4,7 @@ from functools import partial
 import pygame
 import sys
 from player import Cart
-from inputs import Joystick, KeysControl, IAControl, JOYBUTTON
+from inputs import Joystick, KeysControl, IAControl, JOYBUTTON, LinearControl
 import math
 import random
 import assets
@@ -80,7 +80,8 @@ class Game():
         if key in self.joysticks.keys():
             self.axes[key] = Joystick(source=self.joysticks[key], channel=2, dead_zone=0.05)
         else:
-            self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
+            # self.axes[key] = KeysControl(source=pygame.key, key_left=pygame.K_LEFT, key_right=pygame.K_RIGHT, key_intensity=pygame.K_RALT)
+            self.axes[key] = LinearControl()
 
         key = 'p2'
         if key in self.joysticks.keys():

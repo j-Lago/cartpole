@@ -223,9 +223,14 @@ class Cart():
                          border_radius=r_border)
 
         intensity_pixels_gain = int(8 + 2 * random.random()) * 20
-        r_intensity = max(self.last_input * intensity_pixels_gain, 0.)
-        l_intensity = max(-self.last_input * intensity_pixels_gain, 0.)
+        r_intensity = max(self.last_input * intensity_pixels_gain, 0.) * 0.9
+        l_intensity = max(-self.last_input * intensity_pixels_gain, 0.) * 0.9
         jet_height = base_height * 2.75
+
+        if r_intensity > 0:
+            r_intensity += 0.1 * intensity_pixels_gain
+        if l_intensity > 0:
+            l_intensity += 0.1 * intensity_pixels_gain
 
         l_image = pygame.transform.smoothscale(pygame.transform.flip(self.jet, True, False), (l_intensity, jet_height))
         r_image = pygame.transform.smoothscale(self.jet, (r_intensity, jet_height))
